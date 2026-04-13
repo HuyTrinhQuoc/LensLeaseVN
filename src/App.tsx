@@ -1,8 +1,9 @@
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
+import NewListingPage from "./pages/NewListingPage";
 
 function App() {
-  return <UserDashboard />;
+  return <NewListingPage />;
 }
 
 export default App;
