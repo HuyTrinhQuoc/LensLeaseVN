@@ -1,5 +1,6 @@
 import React from "react";
-import "./AdminDashboard.css";
+import "../../styles/AdminDashboard.css";
+import "../../styles/dashboard.css";
 
 interface NavItem {
   icon: string;
