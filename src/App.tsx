@@ -1,121 +1,58 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import Sidebar from './Component/Sidebar';
+import OrderItem from './Component/OrderItem';
+import Header from './Component/Header';
+import HandoverForm from './Component/HandoverForm';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="bg-surface-container-low min-h-screen">
+      <Sidebar />
+      <Header />
+      <main className="ml-64 pt-24 pb-12 px-12">
+        <div className="max-w-6xl mx-auto">
+          {/* Header Section */}
+          <div className="flex justify-between items-end mb-10">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-on-surface mb-2">Đơn thuê của tôi</h2>
+              <p className="text-on-surface-variant font-medium">Quản lý các thiết bị kỹ thuật của bạn.</p>
+            </div>
+          </div>
 
-      <div className="ticks"></div>
+          {/* List Section */}
+          {/* <div className="space-y-6">
+            <OrderItem 
+              title="Sony Alpha A7 IV + 24-70mm GM"
+              code="LL-94021-VN"
+              dateRange="15 Th05 — 20 Th05, 2024"
+              duration="5 ngày thuê"
+              status="Đang thuê"
+              imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuCr4Wzm6DlzaPaPltjeEdBxG8_OxrXPzLblDd_vJuwEFk2OZmea0Z6MORmwvm8cBMfi3hSzDmwUBdm77N2B48F1_ovWBI3yo0lxrLpQYSGv58yKZLzF6JvLyCVXNkLTHI7l8ExGQtTNoZ1WN3aupNVx5dIlLfjcGkUFBKyCuadLsXWL9nwghC3SxxKVeXYL9_la4ok0cSvyKpDOah7aVJn3AyPsOO_tJYXaQAL6a0QvgRoVaufoPfS4XEHrlWaBQOZbqxSymkCm2MI"
+            />
+            
+            <OrderItem 
+              title="Canon EOS R5 (Body Only)"
+              code="LL-93882-VN"
+              dateRange="Hết hạn: 12 Th05, 2024"
+              duration="Quá hạn 3 ngày"
+              status="Quá hạn"
+              imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuBP-oR8imkp_p4qhEkVvZFSZ4qOLR5eq4MJMvU00c68wN1Or3ih-GevKPLo6YSEStNlw4l7hkjorSE2r6ZEltEeT9_0U3Qu3ECIu-n-3KsH358mEyHk2-Yu8ReZOyMvfSrbmNBg9EbVJjky6aw-5q6MEFrVMKGfcQ2W_ne7MG3st3wStmeOMHBSW4CvJsTHhbENFFFs0CLTa5Ps03ttP1jKNQ-79jYez5zfEUPG5yzDdx0g0bvY9uZ3TqwrbrbGAHIgzDEZSUaI6_0"
+            />
+             <OrderItem 
+              title="Canon EOS R5 (Body Only)"
+              code="LL-93882-VN"
+              dateRange="Hết hạn: 12 Th05, 2024"
+              duration="Quá hạn 3 ngày"
+              status="Quá hạn"
+              imageUrl="https://lh3.googleusercontent.com/aida-public/AB6AXuBP-oR8imkp_p4qhEkVvZFSZ4qOLR5eq4MJMvU00c68wN1Or3ih-GevKPLo6YSEStNlw4l7hkjorSE2r6ZEltEeT9_0U3Qu3ECIu-n-3KsH358mEyHk2-Yu8ReZOyMvfSrbmNBg9EbVJjky6aw-5q6MEFrVMKGfcQ2W_ne7MG3st3wStmeOMHBSW4CvJsTHhbENFFFs0CLTa5Ps03ttP1jKNQ-79jYez5zfEUPG5yzDdx0g0bvY9uZ3TqwrbrbGAHIgzDEZSUaI6_0"
+            />
+          </div> */}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          <HandoverForm />
+        </div>
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
