@@ -1,0 +1,4 @@
+/* 
+ * Thư mục assets/styles — CSS/SCSS dùng chung cho toàn app.
+ * Các style cụ thể cho từng module nên đặt ở src/styles/.
+ */

@@ -1,14 +1,12 @@
 import Sidebar from './components/layout/Sidebar';
 import OrderItem from './components/layout/OrderItem';
-import Header from './components/layout/Header';
 import HandoverForm from './components/layout/HandoverForm';
 
 function App() {
   return (
     <div className="bg-surface-container-low min-h-screen">
       <Sidebar />
-      <Header />
-      <main className="ml-64 pt-24 pb-12 px-12">
+      <main className="ml-64 pt-8 pb-12 px-12">
         <div className="max-w-6xl mx-auto">
           {/* Header Section */}
           <div className="flex justify-between items-end mb-10">
