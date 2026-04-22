@@ -1,7 +1,7 @@
-import Sidebar from './Component/Sidebar';
-import OrderItem from './Component/OrderItem';
-import Header from './Component/Header';
-import HandoverForm from './Component/HandoverForm';
+import Sidebar from './components/layout/Sidebar';
+import OrderItem from './components/layout/OrderItem';
+import Header from './components/layout/Header';
+import HandoverForm from './components/layout/HandoverForm';
 
 function App() {
   return (
