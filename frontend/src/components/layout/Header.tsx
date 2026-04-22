@@ -1,32 +1,99 @@
-import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import '../../styles/shared-layout.css';
+
+function Icon({ name, className = '' }: { name: string; className?: string }) {
+  return (
+    <span className={`material-symbols-outlined ${className}`}>
+      {name}
+    </span>
+  );
+}
 
 export default function Header() {
+  const location = useLocation();
+
   return (
-    <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 z-40 bg-white/80 backdrop-blur-xl flex justify-between items-center px-8 border-b border-slate-100">
-      
-      {/* Search Bar */}
-      <div className="relative w-96">
-        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
-        <input 
-          type="text" 
-          placeholder="Tìm kiếm đơn hàng, thiết bị..." 
-          className="w-full pl-10 pr-4 py-2 bg-surface-container-highest/50 border-none focus:ring-2 focus:ring-primary rounded-full text-sm outline-none" 
-        />
-      </div>
-      
-      {/* Icons & Avatar */}
-      <div className="flex items-center gap-6">
-        <button className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
-          <span className="material-symbols-outlined">notifications</span>
-        </button>
-        <button className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
-          <span className="material-symbols-outlined">help</span>
-        </button>
-        <div className="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
-          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3MmsL31_8m9jxfGVLVdwmkp__GfzUOxEbgmBUTemI3R2T6uTjwQ4pk0kzjb2Tk_wLcu_U4cYY4KWRE1mj4pPtVRqSpM7aqVKlOWYj-u89Ej0yxmGG8wAILQvW5kIux7sRwhgxBoM7LPSQas1eDIOAmik-EuMX29f4Cs8CcHCWhbDcKda5X_jUFij69A7yAE5d_BZssM9NBmZ9hVnR9OyIjSpkRSb7n3lkOcvPhnMcWum4zdt1AL0ALEArzaIHzFCY91yFWgjpdvQ" alt="Avatar" className="w-full h-full object-cover" />
+    <header className="dark-header">
+      {/* ── Top Bar ── */}
+      <div className="dark-header__top">
+        <div className="dark-header__container dark-header__top-inner">
+          <span>Giờ mở cửa: 08:30 - 21:30 các ngày trong tuần</span>
+          <Link to="/compare" className="dark-header__top-link">
+            <Icon name="sync_alt" />
+            So sánh sản phẩm
+          </Link>
         </div>
       </div>
-      
+
+      {/* ── Middle Bar ── */}
+      <div className="dark-header__middle">
+        <div className="dark-header__container dark-header__middle-inner">
+          {/* Logo */}
+          <Link to="/" className="dark-header__brand">
+             <div className="dark-header__brand-icon">
+                <Icon name="camera" />
+             </div>
+             <h1>LENSLEASE</h1>
+          </Link>
+
+          {/* Search */}
+          <div className="dark-header__search">
+            <input type="text" placeholder="Tìm kiếm..." />
+            <button className="dark-header__search-btn">
+              <Icon name="search" />
+            </button>
+          </div>
+
+          {/* Actions */}
+          <div className="dark-header__actions">
+            <a href="tel:19006750" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Icon name="call" className="dark-header__action-icon" />
+              <div className="dark-header__action-text">
+                <span className="label">Gọi mua hàng</span>
+                <strong className="value">1900 6750</strong>
+              </div>
+            </a>
+
+            <Link to="/login" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Icon name="person" className="dark-header__action-icon" />
+              <div className="dark-header__action-text">
+                <span className="label">Tài khoản</span>
+                <strong className="value">Đăng nhập</strong>
+              </div>
+            </Link>
+
+            <Link to="/cart" className="dark-header__cart-btn">
+              <div className="dark-header__cart-icon-wrapper">
+                <Icon name="shopping_basket" />
+                <span className="dark-header__cart-badge">0</span>
+              </div>
+              <span>Giỏ hàng</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bottom Bar ── */}
+      <div className="dark-header__bottom">
+        <div className="dark-header__container dark-header__bottom-inner">
+          {/* Category Menu */}
+          <div className="dark-header__category">
+            <Icon name="menu" />
+            <span>DANH MỤC SẢN PHẨM</span>
+          </div>
+
+          {/* Navigation */}
+          <nav className="dark-header__nav">
+            <Link to="/" className={location.pathname === '/' ? 'is-active' : ''}>Trang chủ</Link>
+            <Link to="/about" className={location.pathname === '/about' ? 'is-active' : ''}>Giới thiệu</Link>
+            <Link to="/products" className={location.pathname === '/products' ? 'is-active' : ''}>
+               Sản phẩm <Icon name="arrow_drop_down" className="dropdown-icon" />
+            </Link>
+            <Link to="/news" className={location.pathname === '/news' ? 'is-active' : ''}>Tin tức</Link>
+            <Link to="/contact" className={location.pathname === '/contact' ? 'is-active' : ''}>Liên hệ</Link>
+          </nav>
+        </div>
+      </div>
     </header>
   );
 }
