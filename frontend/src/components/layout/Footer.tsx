@@ -86,11 +86,11 @@ export default function Footer() {
             </ul>
 
             <h4 style={{ marginTop: '32px' }}>PHƯƠNG THỨC THANH TOÁN</h4>
-            <div className="light-footer__payment-methods">
-              <div className="payment-icon mastercard">M</div>
-              <div className="payment-icon visa">VISA</div>
-              <div className="payment-icon jcb">JCB</div>
-              <div className="payment-icon zalopay">ZaloPay</div>
+            <div className="light-footer__payment-methods" style={{ display: 'flex', gap: '16px', alignItems: 'center', marginTop: '12px' }}>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/a/a4/Mastercard_2019_logo.svg" alt="Mastercard" style={{ height: '24px', objectFit: 'contain' }} />
+              <img src="https://icolor.vn/wp-content/uploads/2024/08/logo-visa.png" alt="Visa" style={{ height: '20px', objectFit: 'contain' }} />
+              <img src="https://upload.wikimedia.org/wikipedia/commons/4/40/JCB_logo.svg" alt="JCB" style={{ height: '24px', objectFit: 'contain' }} />
+              <img src="https://cdn.haitrieu.com/wp-content/uploads/2022/10/Logo-ZaloPay-Square.png" alt="ZaloPay" style={{ height: '28px', objectFit: 'contain', borderRadius: '4px' }} />
             </div>
           </div>
         </div>

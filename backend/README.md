@@ -1,98 +1,85 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 📷 LensLeaseVN - Backend API Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Chào mừng bạn đến với kho lưu trữ mã nguồn Backend của dự án **LensLeaseVN** (Nền tảng cho thuê Máy ảnh & Ống kính). 
+Dự án được xây dựng với kiến trúc hướng dịch vụ (Service-Oriented Architecture) bằng NestJS, đảm bảo tính bảo mật, dễ dàng mở rộng và chịu tải cao.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🛠 Tech Stack (Công nghệ sử dụng)
+- **Framework:** [NestJS](https://nestjs.com/) (Node.js framework mạnh mẽ nhất hiện nay).
+- **ORM:** [Prisma v5](https://www.prisma.io/) (Type-safe Database Client).
+- **Database:** PostgreSQL (Lưu trữ đám mây tại [Supabase](https://supabase.com/)).
+- **Connection Pooling:** Sử dụng IPv4 Session Pooler (pgBouncer) của Supabase để tối ưu hóa hiệu suất mạng tại Việt Nam.
+- **Documentation:** Swagger (OpenAPI 3.0).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 🚀 Hướng dẫn cài đặt & Chạy dự án (Getting Started)
 
+Dành cho các thành viên trong nhóm mới clone code về, vui lòng làm theo đúng thứ tự các bước sau:
+
+### 1. Yêu cầu hệ thống (Prerequisites)
+Đảm bảo máy tính của bạn đã cài đặt sẵn:
+- Node.js (phiên bản 18.x hoặc 20.x trở lên).
+- NPM (Đi kèm với Node.js).
+
+### 2. Cài đặt thư viện (Install Dependencies)
+Mở Terminal, trỏ vào thư mục `backend` và chạy lệnh sau để tải các thư viện cần thiết:
 ```bash
-$ npm install
+npm install
 ```
 
-## Compile and run the project
+### 3. Cấu hình Biến Môi Trường (Environment Variables)
+Tuyệt đối KHÔNG ĐƯỢC commit file `.env` lên GitHub để tránh rò rỉ mật khẩu Database!
+1. Tìm file `.env.example` trong thư mục `backend`.
+2. Copy toàn bộ nội dung hoặc Đổi tên file đó thành `.env`.
+3. Nhập mật khẩu thật của Database vào thay thế cho chuỗi `LensLeaseVN%402026` (nếu có thay đổi mật khẩu) tại 2 dòng `DATABASE_URL` và `DIRECT_URL`.
 
+*(Lưu ý: Mật khẩu bắt buộc phải được mã hóa URL, ví dụ ký tự `@` phải viết thành `%40`).*
+
+### 4. Khởi tạo Prisma Client
+Vì chúng ta sử dụng Prisma, bạn cần sinh ra (generate) các Type Definition để VS Code gợi ý code thông minh bằng lệnh:
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npx prisma generate
 ```
 
-## Run tests
-
+### 5. Khởi chạy Server
+Dùng lệnh sau để khởi chạy Server ở chế độ Phát triển (Tự động tải lại khi sửa code):
 ```bash
-# unit tests
-$ npm run test
+npm run start:dev
+```
+Nếu Terminal báo `[NestApplication] Nest application successfully started`, chúc mừng bạn đã cài đặt thành công! Server đang chạy tại: `http://localhost:3000`.
 
-# e2e tests
-$ npm run test:e2e
+---
 
-# test coverage
-$ npm run test:cov
+## 📚 Tài liệu API & Kiểm thử (Testing)
+
+### 1. Swagger API Documentation (Khuyên dùng)
+Backend đã được nhúng sẵn tài liệu API tự động. Khi Server đang chạy, bạn chỉ cần dùng trình duyệt web truy cập vào:
+👉 **[http://localhost:3000/api-docs](http://localhost:3000/api-docs)**
+
+Tại đây, bạn có thể xem giải thích chi tiết cấu trúc JSON trả về của từng API và bấm nút **Try it out** để test trực tiếp trên web.
+
+### 2. Postman Collection
+Dành cho team Tester, tôi đã thiết lập sẵn một bộ kiểm thử chuyên nghiệp.
+- Mở Postman.
+- Import file: `LensLeaseVN_Postman_Collection.json` (Nằm ở thư mục gốc của Backend).
+- Bộ Collection này đã được lập trình sẵn các mã Javascript để tự động kiểm thử (Automated Tests) như: Bắt buộc Join bảng, Status 200, Schema validation...
+
+---
+
+## 📁 Cấu trúc thư mục cốt lõi
+```text
+backend/
+├── prisma/
+│   └── schema.prisma         # Toàn bộ thiết kế các Bảng Database (Tables)
+├── src/
+│   ├── modules/
+│   │   ├── users/            # Quản lý người dùng, phân quyền
+│   │   └── cameras/          # Quản lý Máy ảnh, Ống kính
+│   ├── database/seeders/     # Chứa file SQL để bơm dữ liệu mẫu vào DB
+│   ├── prisma.service.ts     # Trái tim kết nối Database
+│   └── main.ts               # File chạy chính, chứa cấu hình CORS và Swagger
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Chúc cả nhóm đạt điểm tuyệt đối cho Đồ án này! 🎉

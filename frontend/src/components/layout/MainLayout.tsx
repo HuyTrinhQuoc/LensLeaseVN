@@ -34,12 +34,50 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </main>
       <Footer />
 
+      {/* Nút Chuông Thông Báo (Góc Trái) */}
+      <button 
+        style={{
+          position: 'fixed',
+          bottom: '40px',
+          left: '40px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: '#2563eb', // Messenger-like blue
+          color: '#fff',
+          border: 'none',
+          boxShadow: '0 6px 16px rgba(37, 99, 235, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 9999,
+          transition: 'transform 0.2s'
+        }}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        title="Thông báo"
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>notifications</span>
+        {/* Chấm đỏ thông báo */}
+        <span style={{
+          position: 'absolute',
+          top: '12px',
+          right: '14px',
+          width: '10px',
+          height: '10px',
+          backgroundColor: '#ef4444',
+          borderRadius: '50%',
+          border: '2px solid #2563eb'
+        }}></span>
+      </button>
+
       {/* Nút Cuộn Lên Đầu Trang */}
       <button 
         onClick={scrollToTop} 
         style={{
           position: 'fixed',
-          bottom: '40px',
+          bottom: '120px', // Đẩy lên một chút để nhường chỗ cho Messenger (nếu có)
           right: '40px',
           width: '50px',
           height: '50px',
@@ -58,6 +96,33 @@ export default function MainLayout({ children }: MainLayoutProps) {
         title="Lên đầu trang"
       >
         <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_upward</span>
+      </button>
+
+      {/* Nút Chat (Messenger Dummy) - Thay cho ScrollToTop cũ ở sát góc phải dưới */}
+      <button 
+        style={{
+          position: 'fixed',
+          bottom: '40px',
+          right: '40px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: '#0084ff', // Chuẩn màu Messenger
+          color: '#fff',
+          border: 'none',
+          boxShadow: '0 6px 16px rgba(0, 132, 255, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 9999,
+          transition: 'transform 0.2s'
+        }}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        title="Chat với chúng tôi"
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>chat</span>
       </button>
     </div>
   );

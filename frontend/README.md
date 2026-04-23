@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# 🎨 LensLeaseVN - Frontend Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Chào mừng bạn đến với mã nguồn Giao diện (Frontend) của dự án **LensLeaseVN** (Nền tảng cho thuê Máy ảnh & Ống kính).
+Giao diện được xây dựng tối ưu hóa trải nghiệm người dùng (UX) và hiệu năng cực cao bằng Vite và React.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠 Tech Stack (Công nghệ sử dụng)
+- **Framework:** [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/).
+- **Bundler:** [Vite](https://vitejs.dev/) (Build tool siêu tốc, thay thế cho Create React App).
+- **Styling:** CSS thuần (Vanilla CSS) với cấu trúc thiết kế hiện đại, dễ dàng custom.
+- **State Management:** React Context API (CartContext, AuthContext).
+- **Router:** React Router DOM (Điều hướng trang mượt mà không load lại trang).
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Hướng dẫn cài đặt & Chạy dự án (Getting Started)
 
-## Expanding the ESLint configuration
+Dành cho các thành viên trong nhóm mới clone code về, vui lòng làm theo đúng thứ tự sau:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. Yêu cầu hệ thống (Prerequisites)
+Đảm bảo máy tính của bạn đã cài đặt sẵn Node.js và NPM.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Cài đặt thư viện (Install Dependencies)
+Mở Terminal, trỏ vào thư mục `frontend` và chạy lệnh sau để tải các gói thư viện:
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 3. Cấu hình Biến Môi Trường (Environment Variables)
+1. Trong thư mục `frontend`, hãy tạo một file mới và đặt tên là `.env`.
+2. Mở file đó ra và dán 3 dòng cấu hình sau vào (Bạn có thể xin 3 dòng này từ Trưởng nhóm):
+```env
+VITE_API_BASE_URL=http://localhost:3000
+VITE_SUPABASE_URL=https://uhwtgufhkuwdeaxaxnop.supabase.co
+VITE_SUPABASE_ANON_KEY=điền_key_anon_của_bạn_vào_đây
 ```
+*(Lưu ý: File `.env` của Frontend là công khai, mục đích để kết nối với Backend ở cổng 3000 và tính năng đăng nhập của Supabase).*
+
+### 4. Khởi chạy Website
+Dùng lệnh sau để khởi chạy máy chủ phát triển Vite:
+```bash
+npm run dev
+```
+Giao diện trang web của bạn sẽ được mở tại: 👉 **http://localhost:5173**
+
+---
+
+## 🔗 Liên kết với Backend (API Connection)
+- Để hiển thị được dữ liệu sản phẩm, bạn **bắt buộc phải bật Server Backend** ở cổng `3000` (xem hướng dẫn ở file README bên thư mục `backend`).
+- Mọi API Call từ Frontend gửi xuống Backend đều đã được mở khóa CORS an toàn.
+
+---
+
+## 📁 Cấu trúc thư mục cốt lõi
+```text
+frontend/
+├── src/
+│   ├── components/         # Các mảnh ghép giao diện dùng chung (Header, Footer, Navbar...)
+│   ├── pages/              # Các trang chính của Website (Home, Cart, Checkout, Lenses...)
+│   ├── context/            # Nơi lưu trữ trạng thái toàn cục (Giỏ hàng, Đăng nhập...)
+│   ├── routes/             # Cấu hình các đường dẫn (URL) của Website
+│   ├── styles/             # Toàn bộ CSS cho dự án
+│   └── main.tsx            # Điểm bắt đầu (Entry point) của ứng dụng React
+```
+
+Chúc team Frontend thiết kế được một giao diện thật đẹp và mượt mà nhé! 🎨
