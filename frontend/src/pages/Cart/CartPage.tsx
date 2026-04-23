@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../../styles/cart.css';
 
 /* ────────────────────────────────────────────
@@ -123,6 +124,7 @@ function Icon({ name, filled = false, className = '' }: { name: string; filled?:
    CartPage Component
    ──────────────────────────────────────────── */
 export default function CartPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<CartItem[]>(initialCartItems);
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
@@ -494,7 +496,11 @@ export default function CartPage() {
                 </div>
 
                 {/* Checkout button */}
-                <button className="cart-btn-checkout" disabled={selectedItemsList.length === 0}>
+                <button 
+                  className="cart-btn-checkout" 
+                  disabled={selectedItemsList.length === 0}
+                  onClick={() => navigate('/checkout')}
+                >
                   <Icon name="shopping_cart_checkout" />
                   Tiến hành thanh toán
                   {selectedItemsList.length > 0 && (

@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model users {
+  id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  full_name     String?         @db.Text
+  email         String?         @unique @db.Text
+  password_hash String?         @db.Text
+  phone         String?         @db.Text
+  address       String?         @db.Text
+  role          String?         @db.Text
+  bookings      bookings[]
+  lens_listings lens_listings[]
+  reviews       reviews[]
+}
+
+model lens_listings {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  owner_id      String?       @db.Uuid
+  title         String?       @db.Text
+  description   String?       @db.Text
+  brand         String?       @db.Text
+  type          String?       @db.Text
+  price_per_day Decimal?      @db.Decimal
+  available     Boolean?      @default(true)
+  created_at    DateTime?     @default(now()) @db.Timestamp(6)
+  bookings      bookings[]
+  lens_images   lens_images[]
+  owner         users?        @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviews       reviews[]
+}
+
+model lens_images {
+  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  lens_id       String?        @db.Uuid
+  image_url     String?        @db.Text
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model bookings {
+  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String?        @db.Uuid
+  lens_id       String?        @db.Uuid
+  start_date    DateTime?      @db.Date
+  end_date      DateTime?      @db.Date
+  status        String?        @db.Text
+  total_price   Decimal?       @db.Decimal
+  created_at    DateTime?      @default(now()) @db.Timestamp(6)
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model reviews {
+  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String?        @db.Uuid
+  lens_id       String?        @db.Uuid
+  rating        Int?
+  comment       String?        @db.Text
+  created_at    DateTime?      @default(now()) @db.Timestamp(6)
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
