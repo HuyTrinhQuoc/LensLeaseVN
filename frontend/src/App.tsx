@@ -1,5 +1,4 @@
 import Sidebar from './components/layout/Sidebar';
-import OrderItem from './components/layout/OrderItem';
 import HandoverForm from './components/layout/HandoverForm';
 
 function App() {

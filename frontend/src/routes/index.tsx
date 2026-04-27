@@ -6,7 +6,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import HomePage from '../pages/Home/HomePage';
 import CartPage from '../pages/Cart/CartPage';
 import LenderOrdersPage from '../pages/Lender/Orders';
-
+import ProductsPage from '../pages/Products/ProductsPage';
 import CheckoutPage from '../pages/Checkout/CheckoutPage';
 import WalletPage from '../pages/Wallet/WalletPage';
 
@@ -21,6 +21,7 @@ export default function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+         <Route path="/products" element={<ProductsPage />} />
         <Route path="/wallet" element={<WalletPage />} />
       </Route>
 
@@ -32,6 +33,8 @@ export default function AppRoutes() {
       
       {/* ── ADMIN ROUTES ── */}
       {/* Cấu trúc tương tự DashboardLayout nhưng dành cho Admin */}
+
+      
     </Routes>
   );
 }

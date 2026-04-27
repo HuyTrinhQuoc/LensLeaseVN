@@ -1,5 +1,3 @@
-import React from 'react';
-
 const menuItems = [
   { icon: 'dashboard', label: 'Tổng quan', active: false },
   { icon: 'camera_roll', label: 'Đơn thuê', active: true },

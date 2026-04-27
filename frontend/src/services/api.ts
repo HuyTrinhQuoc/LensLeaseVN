@@ -5,7 +5,7 @@ import axios from 'axios';
  * Base URL sẽ được cấu hình qua biến môi trường VITE_API_BASE_URL.
  */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
