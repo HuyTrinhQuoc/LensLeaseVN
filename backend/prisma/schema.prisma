@@ -16,54 +16,86 @@ model users {
   phone         String?         @db.Text
   address       String?         @db.Text
   role          String?         @db.Text
+
   bookings      bookings[]
   lens_listings lens_listings[]
   reviews       reviews[]
 }
 
 model lens_listings {
-  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  owner_id      String?       @db.Uuid
-  title         String?       @db.Text
-  description   String?       @db.Text
-  brand         String?       @db.Text
-  type          String?       @db.Text
-  price_per_day Decimal?      @db.Decimal
-  available     Boolean?      @default(true)
-  created_at    DateTime?     @default(now()) @db.Timestamp(6)
-  bookings      bookings[]
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  owner_id      String?  @db.Uuid
+
+  title         String?  @db.Text
+  description   String?  @db.Text
+  brand         String?  @db.Text
+  type          String?  @db.Text   // camera | lens | accessory
+  category      String?  @db.Text   // DSLR | mirrorless | tele...
+  location      String?  @db.Text   // HCM | HN
+
+  price_per_day Decimal? @db.Decimal
+
+  thumbnail     String?  @db.Text
+
+  rating_avg    Float    @default(0)
+  rating_count  Int      @default(0)
+
+  available     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+
+  owner         users?         @relation(fields: [owner_id], references: [id])
   lens_images   lens_images[]
-  owner         users?        @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings      bookings[]
   reviews       reviews[]
+
+  @@index([price_per_day])
+  @@index([brand])
+  @@index([type])
+  @@index([category])
+  @@index([location])
 }
 
 model lens_images {
-  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  lens_id       String?        @db.Uuid
-  image_url     String?        @db.Text
-  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  lens_id   String?  @db.Uuid
+  image_url String?  @db.Text
+
+  is_main   Boolean  @default(false) // ảnh chính
+
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id])
 }
 
 model bookings {
-  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id       String?        @db.Uuid
-  lens_id       String?        @db.Uuid
-  start_date    DateTime?      @db.Date
-  end_date      DateTime?      @db.Date
-  status        String?        @db.Text
-  total_price   Decimal?       @db.Decimal
-  created_at    DateTime?      @default(now()) @db.Timestamp(6)
-  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users         users?         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String?  @db.Uuid
+  lens_id     String?  @db.Uuid
+
+  start_date  DateTime? @db.Date
+  end_date    DateTime? @db.Date
+
+  status      String?  @db.Text   // pending | confirmed | completed
+  total_price Decimal? @db.Decimal
+
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id])
+  users         users?         @relation(fields: [user_id], references: [id])
+
+  @@index([lens_id, start_date, end_date])
 }
 
 model reviews {
-  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id       String?        @db.Uuid
-  lens_id       String?        @db.Uuid
-  rating        Int?
-  comment       String?        @db.Text
-  created_at    DateTime?      @default(now()) @db.Timestamp(6)
-  lens_listings lens_listings? @relation(fields: [lens_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users         users?         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?  @db.Uuid
+  lens_id    String?  @db.Uuid
+
+  rating     Int      // 1 - 5
+  comment    String?  @db.Text
+
+  created_at DateTime @default(now()) @db.Timestamp(6)
+
+  lens_listings lens_listings? @relation(fields: [lens_id], references: [id])
+  users         users?         @relation(fields: [user_id], references: [id])
+
+  @@index([lens_id])
 }

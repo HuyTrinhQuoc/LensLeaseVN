@@ -1,5 +1,4 @@
-import React from 'react';
-import OrderItem from '../../components/layout/OrderItem';
+
 import HandoverForm from '../../components/layout/HandoverForm';
 
 export default function LenderOrdersPage() {

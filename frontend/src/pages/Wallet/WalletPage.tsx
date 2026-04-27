@@ -1,4 +1,3 @@
-import React from 'react';
 import '../../styles/wallet.css';
 
 export default function WalletPage() {

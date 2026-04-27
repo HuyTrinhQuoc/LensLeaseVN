@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CamerasController } from './cameras.controller';
 import { CamerasService } from './cameras.service';
+import { beforeEach, describe, it } from 'node:test';
+import { expect } from './cameras.service.spec';
 
 describe('CamerasController', () => {
   let controller: CamerasController;

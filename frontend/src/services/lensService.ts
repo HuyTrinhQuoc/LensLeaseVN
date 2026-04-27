@@ -4,8 +4,18 @@ import api from './api';
  * Service quản lý các API liên quan đến ống kính / thiết bị cho thuê.
  */
 export const lensService = {
-  /** Lấy danh sách ống kính */
-  getAll: () => api.get('/lenses'),
+  /** Lấy danh sách ống kính với filter và phân trang */
+  getAll: (filters?: {
+    type?: string;
+    brand?: string;
+    category?: string;
+    location?: string;
+    available?: boolean;
+    sort?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => api.get('/lenses', { params: filters }),
 
   /** Lấy chi tiết một ống kính theo ID */
   getById: (id: string) => api.get(`/lenses/${id}`),

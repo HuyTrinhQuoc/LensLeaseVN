@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CamerasService } from './cameras.service';
 
@@ -8,13 +8,12 @@ export class CamerasController {
   constructor(private readonly camerasService: CamerasService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Lấy tất cả sản phẩm (Public)', description: 'Sử dụng cho trang chủ. Lấy tất cả máy ảnh và ống kính, tự động gộp (JOIN) bảng hình ảnh và tên chủ shop.' })
-  async getAllLenses() {
-    const products = await this.camerasService.findAll();
+  async getAllLenses(@Query() query: any) {
+    const result = await this.camerasService.findAll(query);
+
     return {
       message: 'Lấy danh sách sản phẩm thành công!',
-      count: products.length,
-      data: products,
+      ...result,
     };
   }
 }
