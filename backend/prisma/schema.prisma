@@ -1,11 +1,15 @@
+
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  extensions = [uuidOssp(map: "uuid-ossp")]
 }
 
 model users {
@@ -39,7 +43,7 @@ model lens_listings {
 
   rating_avg    Float    @default(0)
   rating_count  Int      @default(0)
-
+  specs lens_specs?
   available     Boolean  @default(true)
   created_at    DateTime @default(now()) @db.Timestamp(6)
 
@@ -98,4 +102,21 @@ model reviews {
   users         users?         @relation(fields: [user_id], references: [id])
 
   @@index([lens_id])
+}
+model lens_specs {
+  id           String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  lens_id      String @unique @db.Uuid
+
+  focal_length        String? // 35mm | 24-70mm
+  max_aperture        String? // f/1.4
+  mount               String? // Sony E, Canon RF
+  sensor_format       String? // Full-frame | APS-C
+  min_focus_distance  Float?  // meters
+  filter_size         Int?    // mm (67, 77)
+  image_stabilization Boolean?
+  weight              Int?    // grams
+  autofocus_motor     String? // STM, USM...
+  dimensions          String? // 70x100mm
+
+  lens_listings lens_listings @relation(fields: [lens_id], references: [id])
 }

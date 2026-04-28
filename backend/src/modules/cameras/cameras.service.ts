@@ -101,4 +101,37 @@ async findAll(query: any) {
     totalPages: Math.ceil(total / parseInt(limit))
   };
 }
+
+  // Lấy chi tiết một sản phẩm theo ID
+  async findById(id: string) {
+    const product = await this.prisma.lens_listings.findUnique({
+      where: { id },
+      include: {
+        lens_images: true,
+        specs: true,
+        owner: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+            address: true,
+          }
+        },
+        bookings: {
+          select: {
+            start_date: true,
+            end_date: true,
+            status: true,
+          }
+        }
+      }
+    });
+
+    if (!product) {
+      throw new Error('Sản phẩm không tồn tại');
+    }
+
+    return product;
+  }
 }

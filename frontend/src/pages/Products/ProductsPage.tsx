@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import { lensService } from '../../services/lensService';
 import '../../styles/products.css';
@@ -41,9 +42,13 @@ interface ApiResponse {
 }
 
 const ProductsPage = () => {
+  // Get search params from URL
+  const [searchParams] = useSearchParams();
+  const urlSearchQuery = searchParams.get('search') || '';
+
   // State for filters
   const [showFilters, setShowFilters] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [selectedType, setSelectedType] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -68,10 +73,17 @@ const ProductsPage = () => {
   const categories = ['Travel', 'Portrait', 'Macro', 'Sports', 'Landscape', 'General', 'Street', 'Wildlife'];
   const locations = ['Da Nang', 'Hanoi', 'HCM'];
 
+  // Update searchQuery when URL params change
+  useEffect(() => {
+    if (urlSearchQuery) {
+      setSearchQuery(urlSearchQuery);
+    }
+  }, [urlSearchQuery]);
+
   // Fetch products whenever filters or page changes
   useEffect(() => {
     fetchProducts();
-  }, [currentPage, selectedType, selectedBrand, selectedCategory, selectedLocation, selectedAvailable, sortBy, itemsPerPage]);
+  }, [currentPage, selectedType, selectedBrand, selectedCategory, selectedLocation, selectedAvailable, sortBy, itemsPerPage, searchQuery]);
 
   const fetchProducts = async () => {
     try {
@@ -335,44 +347,46 @@ const ProductsPage = () => {
               <>
                 <div className="grid">
                   {products.map((product) => (
-                    <div className="card" key={product.id}>
-                      <div className="card-img">
-                        <img src={getThumbnailImage(product)} alt={product.title} />
-                        <div className="badge">{product.category}</div>
-                        {!product.available && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}>
-                            Không có sẵn
+                    <Link key={product.id} to={`/products/${product.id}`} style={{ textDecoration: 'none' }}>
+                      <div className="card">
+                        <div className="card-img">
+                          <img src={getThumbnailImage(product)} alt={product.title} />
+                          <div className="badge">{product.category}</div>
+                          {!product.available && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '8px',
+                              right: '8px',
+                              backgroundColor: 'rgba(0,0,0,0.7)',
+                              color: 'white',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px'
+                            }}>
+                              Không có sẵn
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="card-body">
+                          <p className="brand">{product.brand}</p>
+                          <h3>{product.title}</h3>
+                          <p className="desc">{product.description}</p>
+
+                          <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                          {product.location} | {product.type}
                           </div>
-                        )}
-                      </div>
 
-                      <div className="card-body">
-                        <p className="brand">{product.brand}</p>
-                        <h3>{product.title}</h3>
-                        <p className="desc">{product.description}</p>
+                          <div className="price">
+                            {parseInt(product.price_per_day.toString()).toLocaleString('vi-VN')} VND/ngày
+                          </div>
 
-                        <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
-                          📍 {product.location} | {product.type}
-                        </div>
-
-                        <div className="price">
-                          {parseInt(product.price_per_day.toString()).toLocaleString('vi-VN')} VND/ngày
-                        </div>
-
-                        <div className="rating">
-                          ★★★★★ ({product.rating_count}) · {product.owner.full_name}
+                          <div className="rating">
+                            ★★★★★ ({product.rating_count}) · {product.owner.full_name}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
 

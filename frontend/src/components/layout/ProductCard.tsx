@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom';
+
 export default function ProductCard({ item }) {
   return (
-    <div className="card">
+    <Link to={`/products/${item.id}`} className="card">
       <div className="card-image">
         <img src={item.thumbnail || item.lens_images?.[0]?.image_url} />
         <div className="badge">{item.type}</div>
@@ -18,6 +20,6 @@ export default function ProductCard({ item }) {
           ⭐ {item.rating_avg} ({item.rating_count})
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
