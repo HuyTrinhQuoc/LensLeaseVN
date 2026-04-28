@@ -7,6 +7,7 @@ import HomePage from '../pages/Home/HomePage';
 import CartPage from '../pages/Cart/CartPage';
 import LenderOrdersPage from '../pages/Lender/Orders';
 import ProductsPage from '../pages/Products/ProductsPage';
+import ProductDetailPage from '../pages/ProductDetail/ProductDetailPage';
 import CheckoutPage from '../pages/Checkout/CheckoutPage';
 import WalletPage from '../pages/Wallet/WalletPage';
 
@@ -22,6 +23,7 @@ export default function AppRoutes() {
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
          <Route path="/products" element={<ProductsPage />} />
+        <Route path="/products/:id" element={<ProductDetailPage />} />
         <Route path="/wallet" element={<WalletPage />} />
       </Route>
 

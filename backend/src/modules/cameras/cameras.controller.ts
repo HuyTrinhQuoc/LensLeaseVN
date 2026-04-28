@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CamerasService } from './cameras.service';
 
@@ -14,6 +14,16 @@ export class CamerasController {
     return {
       message: 'Lấy danh sách sản phẩm thành công!',
       ...result,
+    };
+  }
+
+  @Get(':id')
+  async getLensById(@Param('id') id: string) {
+    const product = await this.camerasService.findById(id);
+
+    return {
+      message: 'Lấy chi tiết sản phẩm thành công!',
+      data: product,
     };
   }
 }
