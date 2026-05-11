@@ -11,6 +11,13 @@ datasource db {
   directUrl = env("DIRECT_URL")
   extensions = [uuidOssp(map: "uuid-ossp")]
 }
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+}
+
+
 
 model users {
   id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
@@ -20,6 +27,8 @@ model users {
   phone         String?         @db.Text
   address       String?         @db.Text
   role          String?         @db.Text
+  auth_provider AuthProvider  @default(LOCAL)
+  provider_id     String?       @db.Text
 
   bookings      bookings[]
   lens_listings lens_listings[]

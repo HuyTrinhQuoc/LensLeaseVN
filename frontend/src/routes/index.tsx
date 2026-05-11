@@ -11,6 +11,10 @@ import ProductDetailPage from '../pages/ProductDetail/ProductDetailPage';
 import CheckoutPage from '../pages/Checkout/CheckoutPage';
 import WalletPage from '../pages/Wallet/WalletPage';
 
+import LoginSuccess from '../pages/Login/GoogleSuccess';
+import Auth from '../pages/Login/Auth';
+import Register from '../pages/Login/Register';
+
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng phân chia theo Role.
  */
@@ -36,7 +40,9 @@ export default function AppRoutes() {
       {/* ── ADMIN ROUTES ── */}
       {/* Cấu trúc tương tự DashboardLayout nhưng dành cho Admin */}
 
-      
+      <Route path="/login" element={<Auth />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/login-success" element={<LoginSuccess />} />
     </Routes>
   );
 }
