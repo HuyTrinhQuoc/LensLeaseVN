@@ -77,7 +77,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onClick={scrollToTop} 
         style={{
           position: 'fixed',
-          bottom: '120px', // Đẩy lên một chút để nhường chỗ cho Messenger (nếu có)
+          bottom: '120px', 
           right: '40px',
           width: '50px',
           height: '50px',

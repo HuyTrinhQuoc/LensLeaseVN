@@ -20,7 +20,7 @@ export class AppController {
       return [];
     }
 
-    const suggestions = await this.prisma.lens_listings.findMany({
+    const suggestions = await this.prisma.lensListing.findMany({
       where: {
         title: {
           contains: q,

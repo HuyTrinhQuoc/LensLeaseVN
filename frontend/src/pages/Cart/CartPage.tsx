@@ -20,6 +20,10 @@ interface CartItem {
   accessories: string[];
   condition: 'Mới' | 'Tốt' | 'Khá';
   available: boolean;
+
+  ownerName: string;
+  ownerAvatar?: string;
+  ownerRating?: number;
 }
 
 /* ────────────────────────────────────────────
@@ -41,6 +45,9 @@ const initialCartItems: CartItem[] = [
     accessories: ['Pin NP-FZ100 x2', 'Sạc rời', 'Thẻ nhớ SD 128GB'],
     condition: 'Mới',
     available: true,
+    ownerName: 'Trần Văn A',
+ownerAvatar: 'https://i.pravatar.cc/40',
+ownerRating: 4.8,
   },
   {
     id: 'LL-002',
@@ -57,6 +64,9 @@ const initialCartItems: CartItem[] = [
     accessories: ['Pin LP-E6NH x1', 'Dây đeo'],
     condition: 'Tốt',
     available: true,
+    ownerName: 'Trần Văn A',
+ownerAvatar: 'https://i.pravatar.cc/40',
+ownerRating: 4.8,
   },
   {
     id: 'LL-003',
@@ -73,6 +83,9 @@ const initialCartItems: CartItem[] = [
     accessories: ['Tay cầm mở rộng', 'Túi đựng'],
     condition: 'Khá',
     available: true,
+    ownerName: 'Trần Văn A',
+ownerAvatar: 'https://i.pravatar.cc/40',
+ownerRating: 4.8,
   },
 ];
 
@@ -440,34 +453,7 @@ export default function CartPage() {
 
                 <div className="cart-summary-card__divider" />
 
-                {/* Coupon */}
-                <div className="cart-coupon">
-                  <div className="cart-coupon__input-wrap">
-                    <Icon name="confirmation_number" />
-                    <input
-                      type="text"
-                      placeholder="Nhập mã giảm giá"
-                      value={couponCode}
-                      onChange={(e) => {
-                        setCouponCode(e.target.value);
-                        if (couponApplied) setCouponApplied(false);
-                      }}
-                    />
-                    <button
-                      className="cart-coupon__btn"
-                      onClick={handleApplyCoupon}
-                      disabled={couponCode.trim().length === 0}
-                    >
-                      Áp dụng
-                    </button>
-                  </div>
-                  {couponApplied && (
-                    <p className="cart-coupon__success">
-                      <Icon name="check_circle" />
-                      Mã giảm giá đã được áp dụng thành công!
-                    </p>
-                  )}
-                </div>
+               
 
                 <div className="cart-summary-card__divider" />
 
@@ -499,7 +485,7 @@ export default function CartPage() {
                 <button 
                   className="cart-btn-checkout" 
                   disabled={selectedItemsList.length === 0}
-                  onClick={() => navigate('/checkout')}
+                  onClick={() => navigate('/Verification')}
                 >
                   <Icon name="shopping_cart_checkout" />
                   Tiến hành thanh toán
@@ -543,3 +529,5 @@ export default function CartPage() {
     </div>
   );
 }
+
+

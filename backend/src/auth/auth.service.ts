@@ -16,13 +16,13 @@ export class AuthService {
   async register(dto: any) {
     const { email, password, fullname, phone } = dto;
 
-    if (await this.prisma.users.findUnique({ where: { email } })) {
+    if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new BadRequestException('Email đã tồn tại!');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const newUser = await this.prisma.users.create({
+    const newUser = await this.prisma.user.create({
       data: {
         email,
         password_hash: passwordHash,
@@ -41,7 +41,7 @@ export class AuthService {
 
   // 2. ĐĂNG NHẬP (LOCAL)
   async login(dto: any) {
-    const user = await this.prisma.users.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
 
     if (!user || !user.password_hash || !(await bcrypt.compare(dto.password, user.password_hash))) {
       throw new UnauthorizedException('Sai email hoặc mật khẩu!');
@@ -55,11 +55,11 @@ export class AuthService {
   async googleLogin(req: any) {
     const { email, fullName, providerId } = req.user;
 
-    let user = await this.prisma.users.findUnique({ where: { email } });
+    let user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       // Nếu chưa có tài khoản -> Tự động tạo mới
-      user = await this.prisma.users.create({
+      user = await this.prisma.user.create({
         data: {
           email,
           full_name: fullName,

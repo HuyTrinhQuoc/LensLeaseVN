@@ -1176,3 +1176,8 @@
     gap: 12px;
   }
 }
+.cart-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 👈 tăng từ mặc định lên 20–24px */
+}

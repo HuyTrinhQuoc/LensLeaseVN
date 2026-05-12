@@ -17,13 +17,14 @@ export class CamerasController {
     };
   }
 
-  @Get(':id')
-  async getLensById(@Param('id') id: string) {
-    const product = await this.camerasService.findById(id);
+@Get(':id')
+async getCameraById(@Param('id') id: string) {
+  const product = await this.camerasService.findById(id); 
 
-    return {
-      message: 'Lấy chi tiết sản phẩm thành công!',
-      data: product,
-    };
-  }
+  return {
+    message: 'Lấy chi tiết sản phẩm thành công!',
+    data: product,
+  };
+}
+  
 }
