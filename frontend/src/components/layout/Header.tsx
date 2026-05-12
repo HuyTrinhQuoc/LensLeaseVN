@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import '../../styles/shared-layout.css';
@@ -15,8 +15,37 @@ export default function Header() {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  // States quản lý User
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Kiểm tra trạng thái đăng nhập khi component mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const savedName = localStorage.getItem('userName');
+    
+    if (token) {
+      setIsLoggedIn(true);
+      setUserName(savedName || 'Người dùng'); // Fallback nếu không có tên
+    }
+  }, [location.pathname]); // Cập nhật lại nếu chuyển trang (ví dụ sau khi login xong)
+
+  // Xử lý click ra ngoài để đóng User Menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -35,17 +64,12 @@ export default function Header() {
   const fetchSuggestions = async (q: string) => {
     try {
       const response = await api.get(`/suggestions?q=${q}`);
-      console.log('Suggestions response:', response.data);
+      const data = Array.isArray(response.data)
+        ? response.data.map((item: any) => item.title || item)
+        : [];
       
-      // Handle array response
-const data = Array.isArray(response.data)
-  ? response.data.map((item: any) => item.title || item)
-  : [];      setSuggestions(data);
-      
-      // Always show dropdown if there are suggestions
-      if (data.length > 0) {
-        setShowDropdown(true);
-      }
+      setSuggestions(data);
+      if (data.length > 0) setShowDropdown(true);
     } catch (err) {
       console.error('Error fetching suggestions:', err);
       setSuggestions([]);
@@ -55,7 +79,6 @@ const data = Array.isArray(response.data)
 
   const handleSearch = (searchQuery: string = query) => {
     if (searchQuery.trim().length === 0) return;
-    
     setShowDropdown(false);
     navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
   };
@@ -66,13 +89,17 @@ const data = Array.isArray(response.data)
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+    if (e.key === 'Enter') handleSearch();
   };
 
-  const handleSearchButtonClick = () => {
-    handleSearch();
+  // Hàm xử lý Đăng xuất
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    setIsLoggedIn(false);
+    setUserName('');
+    setShowUserMenu(false);
+    navigate('/'); // Đưa về trang chủ
   };
 
   return (
@@ -114,18 +141,10 @@ const data = Array.isArray(response.data)
             {showDropdown && suggestions.length > 0 && (
               <div
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: 'white',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  zIndex: 1000,
-                  marginTop: '4px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  backgroundColor: 'white', border: '1px solid #e0e0e0',
+                  borderRadius: '4px', maxHeight: '300px', overflowY: 'auto',
+                  zIndex: 1000, marginTop: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 }}
               >
                 {suggestions.map((suggestion, index) => (
@@ -133,19 +152,12 @@ const data = Array.isArray(response.data)
                     key={index}
                     onClick={() => handleSuggestionClick(suggestion)}
                     style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
+                      padding: '10px 16px', cursor: 'pointer',
                       borderBottom: index < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      color: '#333',
-                      fontSize: '14px',
-                      transition: 'background-color 0.2s',
+                      color: '#333', fontSize: '14px', transition: 'background-color 0.2s',
                     }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.backgroundColor = 'white';
-                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
                   >
                     {suggestion}
                   </div>
@@ -153,11 +165,10 @@ const data = Array.isArray(response.data)
               </div>
             )}
 
-            <button className="dark-header__search-btn" onClick={handleSearchButtonClick}>
+            <button className="dark-header__search-btn" onClick={() => handleSearch()}>
               <Icon name="search" />
             </button>
           </div>
-
 
           {/* Actions */}
           <div className="dark-header__actions">
@@ -169,13 +180,62 @@ const data = Array.isArray(response.data)
               </div>
             </a>
 
-            <Link to="/login" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <Icon name="person" className="dark-header__action-icon" />
-              <div className="dark-header__action-text">
-                <span className="label">Tài khoản</span>
-                <strong className="value">Đăng nhập</strong>
+            {/* ================= PHẦN TÀI KHOẢN / ĐĂNG XUẤT ================= */}
+            {isLoggedIn ? (
+              <div 
+                className="dark-header__action-item" 
+                style={{ textDecoration: 'none', color: 'inherit', position: 'relative', cursor: 'pointer' }}
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                ref={userMenuRef}
+              >
+                <Icon name="account_circle" className="dark-header__action-icon" />
+                <div className="dark-header__action-text">
+                  <span className="label">Xin chào,</span>
+                  <strong className="value">{userName}</strong>
+                </div>
+
+                {/* Dropdown Đăng Xuất */}
+                {showUserMenu && (
+                  <div 
+                    style={{
+                      position: 'absolute', top: '100%', right: 0, marginTop: '10px',
+                      backgroundColor: 'white', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      minWidth: '150px', zIndex: 1000, overflow: 'hidden'
+                    }}
+                  >
+                    <Link 
+                      to="/profile" 
+                      style={{ display: 'block', padding: '10px 16px', color: '#333', textDecoration: 'none', fontSize: '14px' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      Hồ sơ của tôi
+                    </Link>
+                    <button 
+                      onClick={handleLogout}
+                      style={{ 
+                        width: '100%', textAlign: 'left', padding: '10px 16px', color: '#d32f2f', 
+                        border: 'none', borderTop: '1px solid #eee', background: 'transparent', 
+                        cursor: 'pointer', fontSize: '14px', fontWeight: 'bold'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fff5f5')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
               </div>
-            </Link>
+            ) : (
+              <Link to="/login" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Icon name="person" className="dark-header__action-icon" />
+                <div className="dark-header__action-text">
+                  <span className="label">Tài khoản</span>
+                  <strong className="value">Đăng nhập</strong>
+                </div>
+              </Link>
+            )}
+            {/* ============================================================== */}
 
             <Link to="/cart" className="dark-header__cart-btn">
               <div className="dark-header__cart-icon-wrapper">
@@ -191,13 +251,11 @@ const data = Array.isArray(response.data)
       {/* ── Bottom Bar ── */}
       <div className="dark-header__bottom">
         <div className="dark-header__container dark-header__bottom-inner">
-          {/* Category Menu */}
           <div className="dark-header__category">
             <Icon name="menu" />
             <span>DANH MỤC SẢN PHẨM</span>
           </div>
 
-          {/* Navigation */}
           <nav className="dark-header__nav">
             <Link to="/" className={location.pathname === '/' ? 'is-active' : ''}>Trang chủ</Link>
             <Link to="/about" className={location.pathname === '/about' ? 'is-active' : ''}>Giới thiệu</Link>
