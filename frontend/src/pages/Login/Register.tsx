@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -34,8 +34,7 @@ const Register = () => {
 
     setIsLoading(true);
     try {
-      // Gọi API Backend
-      const res = await axios.post('http://localhost:3000/auth/register', formData);
+      await api.post('/auth/register', formData);
       setSuccessMsg('Đăng ký thành công! Vui lòng kiểm tra email của bạn.');
       
       // Chờ 2 giây để user đọc thông báo rồi tự chuyển sang trang Login
@@ -45,10 +44,6 @@ const Register = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:3000/auth/google';
   };
 
   return (

@@ -1,6 +1,19 @@
-import React from "react";
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import LensRentalSchedulePanel from '../../components/scheduling/LensRentalSchedulePanel';
+import { todayVietnamYmd, addDaysUtcYmd } from '../../utils/date-only';
+
 const BookingPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const lensId = (searchParams.get('lensId') || '').trim();
+  const [startDate, setStartDate] = useState(() => todayVietnamYmd());
+  const [endDate, setEndDate] = useState(() => addDaysUtcYmd(todayVietnamYmd(), 3));
+
+  useEffect(() => {
+    if (!lensId) return;
+    setStartDate(todayVietnamYmd());
+    setEndDate(addDaysUtcYmd(todayVietnamYmd(), 3));
+  }, [lensId]);
   const addons = [
     {
       id: 1,
@@ -23,36 +36,6 @@ const BookingPage: React.FC = () => {
       image:
         "https://images.unsplash.com/photo-1516724562728-afc824a36e84?q=80&w=1200&auto=format&fit=crop",
     },
-  ];
-
-  const days = [
-    "20",
-    "31",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "10",
-    "11",
-    "12",
-    "13",
-    "14",
-    "15",
-    "16",
-    "17",
-    "18",
-    "19",
-    "20",
-    "21",
-    "22",
-    "23",
-    "24",
-    "25",
   ];
 
   return (
@@ -160,79 +143,56 @@ const BookingPage: React.FC = () => {
 
           {/* CENTER */}
           <div className="col-span-5 flex flex-col gap-4">
-            {/* CALENDAR */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-800">
-                  Select Dates Calendar
-                </h3>
-
-                <div className="flex gap-2">
-                  <button className="h-9 w-9 rounded-lg border border-slate-200">
-                    ←
-                  </button>
-
-                  <button className="h-9 w-9 rounded-lg border border-slate-200">
-                    →
-                  </button>
+              <h3 className="text-lg font-bold text-slate-800">Đặt lịch thuê</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Lịch trống và kiểm tra khả dụng lấy từ API giống trang chi tiết sản phẩm. Thêm{' '}
+                <code className="rounded bg-slate-100 px-1 text-xs">?lensId=</code> vào URL để gắn với một máy cụ
+                thể.
+              </p>
+              {!lensId ? (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p className="mb-3">Chưa có mã thiết bị trong URL.</p>
+                  <Link
+                    to="/products"
+                    className="inline-flex rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                  >
+                    Chọn sản phẩm &amp; đặt lịch
+                  </Link>
                 </div>
-              </div>
-
-              <div className="mb-5 text-center font-bold text-slate-700">
-                October 2023
-              </div>
-
-              <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs text-slate-500">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                  (day) => (
-                    <div key={day}>{day}</div>
-                  )
-                )}
-              </div>
-
-              <div className="grid grid-cols-7 place-items-center gap-2">
-                {days.map((day, index) => {
-                  const isDisabled = index === 0 || index === 1 || index === 7 || index === 8;
-                  const isRange = day === "10" || day === "11";
-                  const isSelected = day === "14" || day === "15";
-
-                  return (
-                    <div
-                      key={index}
-                      className={`
-                        flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-sm font-semibold transition
-                        ${isDisabled ? "opacity-30" : ""}
-                        ${isRange ? "bg-blue-100 text-blue-600" : ""}
-                        ${
-                          isSelected
-                            ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
-                            : ""
-                        }
-                        hover:bg-blue-50
-                      `}
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Đang xếp lịch cho lens:{' '}
+                    <Link to={`/products/${lensId}`} className="font-mono font-semibold text-blue-700 underline">
+                      {lensId.slice(0, 8)}…
+                    </Link>
+                  </p>
+                  <LensRentalSchedulePanel
+                    lensId={lensId}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onStartDateChange={setStartDate}
+                    onEndDateChange={setEndDate}
+                    productDetailHref={`/products/${lensId}`}
+                    variant="default"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      to={`/products/${lensId}`}
+                      className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 py-3 text-center text-sm font-bold text-slate-700 transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
                     >
-                      {day}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-6 flex gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                  Ngày đang chọn
+                      Mở trang sản phẩm (đặt lịch + giỏ)
+                    </Link>
+                    <Link
+                      to="/cart"
+                      className="inline-flex flex-1 items-center justify-center rounded-xl bg-blue-600 py-3 text-center text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+                    >
+                      Đi tới giỏ hàng
+                    </Link>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-slate-300"></div>
-                  Đã được thuê
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-blue-200"></div>
-                  Chờ duyệt
-                </div>
-              </div>
+              )}
             </div>
 
             {/* POLICY */}

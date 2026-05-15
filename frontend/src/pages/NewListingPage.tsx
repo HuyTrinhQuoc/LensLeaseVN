@@ -229,29 +229,32 @@ function NewListingPage() {
                   </div>
 
                   <div className="listing-form-field">
-                    <label>Gói bảo hiểm đề xuất</label>
-                    <select defaultValue="Cơ bản (Đề xuất)">
-                      <option>Cơ bản (Đề xuất)</option>
-                      <option>Toàn diện (+15%)</option>
-                      <option>Không bảo hiểm (Rủi ro cao)</option>
-                    </select>
+                    <label>Phí bảo hiểm thiết bị</label>
+                    <div className="listing-info-badge">
+                      <Icon name="verified_user" />
+                      <span>Tự động (1% giá trị máy)</span>
+                    </div>
+                    <p className="listing-field-note mt-1 text-[10px]">Phí này dùng để bồi thường 50% còn lại nếu có rủi ro.</p>
                   </div>
 
                   <div className="listing-warning-box full">
                     <label className="listing-warning-box__label">
-                      <Icon name="warning" />
-                      Giá đền bù nếu hư hỏng/mất mát
+                      <Icon name="monetization_on" />
+                      Giá trị thực tế của thiết bị (Market Value)
                     </label>
 
                     <p>
-                      Mức phí này sẽ là căn cứ pháp lý để giải quyết khi có sự
-                      cố nghiêm trọng.
+                      Mức giá này dùng để tính tiền cọc (**50% giá trị**) và phí bảo hiểm. 
+                      Vui lòng nhập giá trị thị trường chính xác của máy cũ.
                     </p>
 
-                    <div className="listing-input-with-suffix listing-input-with-suffix--danger">
-                      <input type="text" placeholder="45.000.000" />
+                    <div className="listing-input-with-suffix listing-input-with-suffix--success">
+                      <input type="text" placeholder="Ví dụ: 30.000.000" />
                       <span>VNĐ</span>
                     </div>
+                    <p className="mt-2 text-[11px] text-emerald-700 font-medium">
+                      * Hệ thống sẽ tự động yêu cầu khách thuê ký quỹ 50% số tiền này qua sàn.
+                    </p>
                   </div>
                 </div>
               </section>

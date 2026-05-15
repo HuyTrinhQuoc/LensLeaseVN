@@ -7,6 +7,10 @@ import { CamerasModule } from './modules/cameras/cameras.module';
 import { PrismaService } from './prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { MailService } from './mail/mail.service';
+import { CartModule } from './modules/cart/cart.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
+import { WalletModule } from './modules/wallet/wallet.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -16,6 +20,10 @@ import { MailService } from './mail/mail.service';
     UsersModule,
     CamerasModule,
     AuthModule,
+    CartModule,
+    BookingsModule,
+    WalletModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, MailService],

@@ -1,3 +1,5 @@
+import { VIETNAM_TIME_ZONE } from './date-only';
+
 /**
  * Format số tiền sang định dạng tiền tệ Việt Nam.
  * Ví dụ: 1500000 → "1.500.000đ"
@@ -7,30 +9,35 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
- * Format ngày tháng sang định dạng dd/MM/yyyy.
- * Ví dụ: "2024-05-15" → "15/05/2024"
+ * Format ngày tháng sang định dạng dd/MM/yyyy (theo lịch Việt Nam nếu là ISO có giờ).
  */
 export function formatDate(dateStr: string): string {
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr.trim());
+  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
   const d = new Date(dateStr);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: VIETNAM_TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(d);
 }
 
 /**
- * Format ngày giờ đầy đủ.
- * Ví dụ: "15 tháng 05, 2024 - 09:30"
+ * Format ngày giờ đầy đủ theo giờ Việt Nam.
  */
 export function formatDateTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('vi-VN', {
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: VIETNAM_TIME_ZONE,
     day: '2-digit',
     month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  }).format(d);
 }
 
 /**

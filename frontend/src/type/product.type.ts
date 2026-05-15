@@ -28,9 +28,10 @@ export interface ProductItem {
   district?: string;
   available?:boolean;
   owner?: {
-  id: string;
-  full_name: string;
-};
+    id: string;
+    full_name: string;
+    avatar_url?: string | null;
+  };
 
   
 }

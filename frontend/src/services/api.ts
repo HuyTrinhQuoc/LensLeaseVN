@@ -15,9 +15,22 @@ const api = axios.create({
 // ── Request interceptor: thêm token xác thực ──
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token =
+      localStorage.getItem('token') || localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      
+      try {
+        if (token.split('.').length === 3) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const userId = payload.userId || payload.sub;
+          if (userId) {
+            config.headers['x-user-id'] = userId;
+          }
+        } else {
+          config.headers['x-user-id'] = token;
+        }
+      } catch (e) {}
     }
     return config;
   },

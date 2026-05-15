@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ProductItem } from "../../type/product.type";
+import ProductCard from "../../components/layout/ProductCard";
+import Pagination from "../../components/common/Pagination";
 
 interface PaginatedResponse {
   data: ProductItem[];
@@ -100,77 +102,111 @@ export default function ProductsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-8">
         
         {/* ================= CỘT TRÁI: SIDEBAR LỌC (Khoảng 25%) ================= */}
-        <aside className="w-full lg:w-1/4 space-y-6">
-          <div className="flex items-center gap-2 mb-4 text-gray-800 font-bold text-lg">
-            <span>⚙️</span> Bộ lọc tìm kiếm
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
-            {/* Lọc Giá */}
-            <div>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Giá thuê (VND/Ngày)</h3>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="number" 
-                  placeholder="Từ..." 
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                  value={filterMinPrice}
-                  onChange={(e) => setFilterMinPrice(e.target.value)}
-                />
-                <span className="text-gray-400">-</span>
-                <input 
-                  type="number" 
-                  placeholder="Đến..." 
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                  value={filterMaxPrice}
-                  onChange={(e) => setFilterMaxPrice(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Lọc Đánh giá */}
-            <div>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Đánh giá chủ máy</h3>
-              <label className="flex items-center gap-3 mb-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  checked={filterMinRating}
-                  onChange={(e) => setFilterMinRating(e.target.checked)}
-                />
-                <span className="text-sm text-gray-700 font-medium">Trust Score 5+ ⭐</span>
-              </label>
-            </div>
-
-            {/* Lọc Vị trí */}
-            <div>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Vị trí gần nhất</h3>
-              <select 
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 text-gray-700 bg-white"
-                value={filterCity}
-                onChange={(e) => setFilterCity(e.target.value)}
+        <aside className="w-full lg:w-1/4">
+          <div className="sticky top-24 space-y-6">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600">tune</span>
+                BỘ LỌC
+              </h2>
+              <button 
+                onClick={() => {
+                  setFilterMinPrice("");
+                  setFilterMaxPrice("");
+                  setFilterMinRating(false);
+                  setFilterCity("");
+                  setAppliedFilters({ minPrice: "", maxPrice: "", minRating: "", city: "" });
+                }}
+                className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors"
               >
-                <option value="">📍 Toàn thành phố</option>
-                <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                <option value="Hà Nội">Hà Nội</option>
-                <option value="Đà Nẵng">Đà Nẵng</option>
-              </select>
+                Xóa tất cả
+              </button>
             </div>
 
-            {/* Nút Áp dụng */}
-            <button 
-              onClick={handleApplyFilters}
-              className="w-full bg-[#0a46b5] text-white font-bold py-3 rounded-xl hover:bg-blue-800 transition-colors shadow-md shadow-blue-500/20"
-            >
-              Áp dụng bộ lọc
-            </button>
-          </div>
+            <div className="bg-white p-7 rounded-[24px] shadow-sm border border-gray-100 space-y-8">
+              {/* Lọc Giá */}
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Khoảng giá (VNĐ)</h3>
+                <div className="space-y-3">
+                  <div className="relative group">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs group-focus-within:text-blue-600">Từ</span>
+                    <input 
+                      type="number" 
+                      placeholder="0" 
+                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                      value={filterMinPrice}
+                      onChange={(e) => setFilterMinPrice(e.target.value)}
+                    />
+                  </div>
+                  <div className="relative group">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs group-focus-within:text-blue-600">Đến</span>
+                    <input 
+                      type="number" 
+                      placeholder="5.000.000" 
+                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                      value={filterMaxPrice}
+                      onChange={(e) => setFilterMaxPrice(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
-          {/* Widget Trợ giúp */}
-          <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-            <h4 className="font-bold text-gray-900 mb-2">Trợ giúp nhanh?</h4>
-            <p className="text-sm text-gray-600 mb-4">Bạn chưa tìm thấy thiết bị ưng ý? Hãy để chuyên gia của chúng tôi giúp bạn.</p>
-            <a href="#" className="text-blue-600 text-sm font-bold hover:underline">Nhắn tin ngay &rarr;</a>
+              {/* Lọc Đánh giá */}
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Chất lượng</h3>
+                <label className="flex items-center p-4 bg-orange-50/50 border border-orange-100 rounded-2xl cursor-pointer group hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-5 h-5 rounded-md border-orange-200 text-orange-500 focus:ring-orange-200 cursor-pointer"
+                    checked={filterMinRating}
+                    onChange={(e) => setFilterMinRating(e.target.checked)}
+                  />
+                  <div className="ml-3">
+                    <p className="text-sm font-bold text-orange-900">Trust Score 5.0</p>
+                    <p className="text-[10px] text-orange-600 font-medium">Chủ máy uy tín nhất</p>
+                  </div>
+                  <span className="ml-auto text-lg">⭐</span>
+                </label>
+              </div>
+
+              {/* Lọc Vị trí */}
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Khu vực</h3>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400">location_on</span>
+                  <select 
+                    className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none appearance-none"
+                    value={filterCity}
+                    onChange={(e) => setFilterCity(e.target.value)}
+                  >
+                    <option value="">Tất cả thành phố</option>
+                    <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                    <option value="Hà Nội">Hà Nội</option>
+                    <option value="Đà Nẵng">Đà Nẵng</option>
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 pointer-events-none">expand_more</span>
+                </div>
+              </div>
+
+              {/* Nút Áp dụng */}
+              <button 
+                onClick={handleApplyFilters}
+                className="w-full bg-[#1a3fc7] text-white font-black py-4 rounded-2xl hover:bg-blue-800 transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px]">done_all</span>
+                ÁP DỤNG
+              </button>
+            </div>
+
+            {/* Banner hỗ trợ */}
+            <div className="bg-gradient-to-br from-gray-900 to-blue-900 p-6 rounded-[24px] text-white shadow-lg overflow-hidden relative group">
+              <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+              <h4 className="font-bold text-sm mb-2 relative z-10">Cần tư vấn ngay?</h4>
+              <p className="text-[11px] text-gray-300 mb-4 leading-relaxed relative z-10">Liên hệ đội ngũ CSKH để tìm thiết bị phù hợp nhất với nhu cầu của bạn.</p>
+              <a href="/contact" className="inline-flex items-center gap-2 text-blue-400 text-[11px] font-black uppercase tracking-wider hover:text-white transition-colors relative z-10">
+                GỌI HỖ TRỢ <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </a>
+            </div>
           </div>
         </aside>
 
@@ -223,111 +259,20 @@ export default function ProductsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {products.map((item) => {
-                const img = item.thumbnail || (item.images && item.images[0]?.image_url) || "/placeholder.jpg";
-                // Random tag theo ảnh thiết kế (Bạn có thể map với category/status thật)
-                const isAvailable = item.available;
-                
-                return (
-                  <Link 
-                    key={item.id}
-                    to={`/products/${item.id}`}
-                    className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden flex flex-col"
-                  >
-                    {/* Ảnh & Badges */}
-                    <div className="relative w-full aspect-[4/3] bg-gray-100">
-                      <img src={img} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      
-                      {/* Badge Góc Trái */}
-                      <div className={`absolute top-3 left-3 px-2.5 py-1 rounded text-[10px] font-bold text-white uppercase tracking-wider shadow-sm ${isAvailable ? 'bg-blue-600' : 'bg-red-500'}`}>
-                        {isAvailable ? "CÓ SẴN NGAY" : "ĐÃ CHO THUÊ"}
-                      </div>
-
-                      {/* Nút tim Góc Phải */}
-                      <button className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors shadow-sm">
-                        🤍
-                      </button>
-                    </div>
-
-                    {/* Nội dung Card */}
-                    <div className="p-5 flex flex-col flex-grow">
-                      <div className="flex justify-between items-start gap-2 mb-2">
-                        <h3 className="font-bold text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
-                          {item.title}
-                        </h3>
-                        {/* Rating Badge Nhỏ */}
-                        {item.rating_avg && (
-                          <div className="flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap">
-                            <span className="text-orange-500 text-[10px]">⭐</span>
-                            <span className="text-[11px] font-bold text-orange-700">{Number(item.rating_avg).toFixed(1)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-gray-500 mb-4 flex items-center gap-1">
-                       {item.district ? `${item.district}, ${item.city}` : 'Không rõ vị trí'}
-                      </div>
-
-                      {/* Footer Card */}
-                      <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Giá thuê từ</p>
-                          <p className="text-blue-600 font-bold text-base">
-                            {formatPrice(item.price_per_day)}đ<span className="text-xs font-normal text-gray-500">/ngày</span>
-                          </p>
-                        </div>
-                        
-                        {/* Avatar Chủ máy */}
-                        <div className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-xs overflow-hidden" title={item.owner?.full_name}>
-                          👤
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+              {products.map((item) => (
+                <ProductCard key={item.id} item={item} />
+              ))}
             </div>
           )}
 
           {/* ================= PAGINATION ================= */}
           {!loading && totalPages > 1 && (
-            <div className="mt-10 flex justify-center items-center gap-2">
-              <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
-              >
-                &lsaquo;
-              </button>
-              
-              {/* Render danh sách số trang (Đơn giản hóa) */}
-              {Array.from({ length: totalPages }).map((_, idx) => {
-                const pageNum = idx + 1;
-                // Rút gọn trang nếu quá nhiều (chỉ hiện trang hiện tại, +/- 1 trang, trang đầu, trang cuối)
-                if (pageNum === 1 || pageNum === totalPages || (pageNum >= page - 1 && pageNum <= page + 1)) {
-                  return (
-                    <button 
-                      key={pageNum}
-                      onClick={() => setPage(pageNum)}
-                      className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${page === pageNum ? 'bg-[#0a46b5] text-white shadow-md' : 'text-gray-700 hover:bg-gray-200'}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                }
-                if (pageNum === page - 2 || pageNum === page + 2) {
-                  return <span key={pageNum} className="text-gray-400">...</span>;
-                }
-                return null;
-              })}
-
-              <button 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
-              >
-                &rsaquo;
-              </button>
+            <div className="mt-10">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(p) => setPage(p)}
+              />
             </div>
           )}
 

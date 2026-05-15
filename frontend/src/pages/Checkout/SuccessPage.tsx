@@ -1,193 +1,290 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { paymentService } from '../../services/payment.service';
+import { getAuthToken } from '../../utils/auth';
+
+type SuccessBooking = {
+  id: string;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  items?: Array<{
+    lens?: { title?: string; images?: Array<{ image_url?: string }> };
+  }>;
+  owner?: { full_name?: string };
+};
+
+export type CheckoutSuccessPayload = {
+  booking_group_id?: string;
+  booking_group_status?: string;
+  total_amount?: number;
+  bookings?: SuccessBooking[];
+};
+
+/** Logo VNPay (nguồn ngoài — có thể thay bằng file trong `/public` khi deploy). */
+const VNPAY_LOGO_URL =
+  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRAVztuTczylvs5j_Yqd_nneg23zDdg0wSmcMzApHUxGA&s&ec=121691717';
+
+function formatShortId(id: string) {
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
+function formatDateVi(iso?: string) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('vi-VN');
+}
 
 export default function BookingSuccessPage() {
+  const location = useLocation();
+  const checkout = location.state?.checkout as CheckoutSuccessPayload | undefined;
+
+  const groupId = checkout?.booking_group_id;
+  const bookings = checkout?.bookings ?? [];
+  const totalAmount = checkout?.total_amount;
+  const groupStatus = checkout?.booking_group_status;
+
+  const [vnpayOn, setVnpayOn] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState('');
+
+  useEffect(() => {
+    void paymentService
+      .getGatewayConfig()
+      .then((r) => setVnpayOn(!!r.data?.data?.vnpay))
+      .catch(() => setVnpayOn(false));
+  }, []);
+
+  const canVnpayPrepay =
+    Boolean(getAuthToken()) &&
+    Boolean(groupId) &&
+    vnpayOn &&
+    (groupStatus === 'PENDING' || groupStatus === undefined);
+
+  const first = bookings[0];
+  const firstLens = first?.items?.[0]?.lens;
+  const thumb =
+    firstLens?.images?.[0]?.image_url ||
+    'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=400&auto=format&fit=crop';
+
   return (
     <div className="min-h-screen bg-[#f4f7fa] text-gray-800">
-      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <div className="text-xl font-extrabold text-[#0b45b3]">
-              LensLease VN
-            </div>
-
+            <div className="text-xl font-extrabold text-[#0b45b3]">LensLease VN</div>
             <div className="hidden h-6 w-px bg-gray-200 md:block" />
-
-            <div className="hidden text-sm font-medium text-gray-500 md:block">
-              Thanh toán thành công
-            </div>
+            <div className="hidden text-sm font-medium text-gray-500 md:block">Đặt thuê</div>
           </div>
-
           <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-            <span className="material-symbols-outlined text-[18px]">
-              verified_user
-            </span>
-            Giao dịch bảo mật
+            <span className="material-symbols-outlined text-[18px]">verified_user</span>
+            Giao dịch nội bộ an toàn
           </div>
         </div>
       </header>
 
-      {/* CONTENT */}
       <main className="mx-auto max-w-4xl px-4 py-10">
-        {/* SUCCESS ICON */}
         <div className="mb-6 flex justify-center">
           <div className="flex h-24 w-24 items-center justify-center rounded-full bg-green-100">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-200">
-              <span className="material-symbols-outlined text-[40px]">
-                check
-              </span>
+              <span className="material-symbols-outlined text-[40px]">check</span>
             </div>
           </div>
         </div>
 
-        {/* SUCCESS TEXT */}
         <div className="text-center">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-semibold text-green-700">
-            <span className="material-symbols-outlined text-[18px]">
-              verified
-            </span>
-            Payment Successful
+            <span className="material-symbols-outlined text-[18px]">task_alt</span>
+            Đã tạo yêu cầu thuê
           </div>
 
-          <h1 className="text-4xl font-extrabold text-gray-900">
-            Đặt thuê thành công 🎉
-          </h1>
+          <h1 className="text-4xl font-extrabold text-gray-900">Đặt thuê thành công</h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-gray-500">
-            Yêu cầu thuê thiết bị của bạn đã được ghi nhận và thanh toán thành
-            công. Chủ thiết bị sẽ xác nhận đơn thuê trong thời gian sớm nhất.
+            Đơn của bạn đang <strong>chờ chủ thiết bị xác nhận</strong>. Tiền trong ví sẽ{' '}
+            <strong>chỉ bị trừ khi họ duyệt</strong> từng đơn (tiền thuê + phí sàn + ký quỹ nền tảng theo cài đặt).
+            Bạn có thể theo dõi trong mục Đơn thuê.
           </p>
         </div>
 
-        {/* ORDER CARD */}
         <div className="mt-10 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-          {/* TOP */}
           <div className="flex flex-col gap-6 border-b border-gray-100 pb-6 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-sm font-medium text-gray-500">
-                Mã đơn thuê
+                {groupId ? 'Mã nhóm đơn (Booking group)' : 'Mã đơn'}
               </div>
-
               <div className="mt-1 text-2xl font-extrabold text-[#0b45b3]">
-                #LL-2024-1088
+                {groupId ? `#${formatShortId(groupId)}` : '—'}
               </div>
+              {typeof totalAmount === 'number' ? (
+                <p className="mt-2 text-sm text-gray-600">
+                  Tổng cần trên ví khi các chủ duyệt (thuê + phí sàn + cọc nền tảng nếu có):{' '}
+                  <strong>{new Intl.NumberFormat('vi-VN').format(totalAmount)}đ</strong>
+                </p>
+              ) : null}
             </div>
 
             <div className="rounded-2xl bg-blue-50 px-5 py-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                Trạng thái
-              </div>
-
+              <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Trạng thái</div>
               <div className="mt-1 flex items-center gap-2 text-sm font-bold text-blue-900">
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
-                Đang chờ chủ thiết bị xác nhận
+                Chờ chủ thiết bị xác nhận
               </div>
             </div>
           </div>
 
-          {/* PRODUCT */}
-          <div className="flex flex-col gap-5 border-b border-gray-100 py-6 md:flex-row">
-            <img
-              src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=1200&auto=format&fit=crop"
-              alt="Camera"
-              className="h-28 w-full rounded-2xl object-cover md:w-40"
-            />
-
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">
-                Sony Alpha A7 IV + FE 24-70mm GM II
-              </h2>
-
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                <span>
-                  Chủ thiết bị:{' '}
-                  <span className="font-semibold text-[#0b45b3]">
-                    Hoàng Nam Photo
+          {first ? (
+            <div className="flex flex-col gap-5 border-b border-gray-100 py-6 md:flex-row">
+              <img src={thumb} alt="" className="h-28 w-full rounded-2xl object-cover md:w-40" />
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-gray-900">{firstLens?.title ?? 'Thiết bị'}</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                  <span>
+                    Chủ thiết bị:{' '}
+                    <span className="font-semibold text-[#0b45b3]">{first?.owner?.full_name ?? '—'}</span>
                   </span>
-                </span>
-
-                <span>•</span>
-
-                <span>15/10/2024 → 18/10/2024</span>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                  💾 Thẻ nhớ 128GB
-                </div>
-
-                <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                  🔭 Chân máy
+                  <span>•</span>
+                  <span>
+                    {formatDateVi(first.start_date)} → {formatDateVi(first.end_date)}
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
-          {/* PAYMENT SUMMARY */}
-          <div className="space-y-4 py-6">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">
-                Tổng thanh toán
-              </span>
-
-              <span className="text-lg font-bold text-gray-900">
-                2.625.000đ
-              </span>
+          {bookings.length > 1 ? (
+            <div className="border-b border-gray-100 py-4">
+              <p className="mb-2 text-sm font-semibold text-gray-700">Các đơn con ({bookings.length})</p>
+              <ul className="space-y-2 text-sm text-gray-600">
+                {bookings.map((b) => (
+                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>Đơn #{formatShortId(b.id)}</span>
+                    <Link className="font-medium text-[#0b45b3] hover:underline" to={`/bookings/${b.id}`}>
+                      Xem chi tiết
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">
-                Phương thức thanh toán
-              </span>
-
-              <span className="font-semibold text-gray-900">
-                VietQR
-              </span>
+          ) : first ? (
+            <div className="border-b border-gray-100 py-4 text-sm">
+              <Link className="font-semibold text-[#0b45b3] hover:underline" to={`/bookings/${first.id}`}>
+                Xem chi tiết đơn →
+              </Link>
             </div>
+          ) : null}
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">
-                Thời gian thanh toán
-              </span>
-
-              <span className="font-semibold text-gray-900">
-                14:32 • 15/10/2024
-              </span>
+          <div className="space-y-2 py-6 text-sm">
+            <div className="flex justify-between text-gray-500">
+              <span>Thời điểm</span>
+              <span className="font-semibold text-gray-900">{new Date().toLocaleString('vi-VN')}</span>
             </div>
           </div>
 
-          {/* INFO */}
           <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                <span className="material-symbols-outlined">
-                  info
-                </span>
+                <span className="material-symbols-outlined">info</span>
               </div>
-
               <div>
-                <h3 className="font-bold text-blue-900">
-                  Điều gì xảy ra tiếp theo?
-                </h3>
-
+                <h3 className="font-bold text-blue-900">Tiếp theo?</h3>
                 <ul className="mt-3 space-y-2 text-sm leading-relaxed text-blue-900">
-                  <li>
-                    • Chủ thiết bị sẽ xác nhận yêu cầu thuê của bạn.
-                  </li>
-
-                  <li>
-                    • Sau khi xác nhận, bạn sẽ nhận thông tin nhận máy.
-                  </li>
-
-                  <li>
-                    • LensLease sẽ gửi email + thông báo cập nhật trạng thái.
-                  </li>
+                  <li>• Chủ thiết bị duyệt hoặc từ chối từng đơn.</li>
+                  <li>• Khi được duyệt, hệ thống trừ ví theo từng đơn.</li>
+                  <li>• Kiểm tra số dư tại trang Ví ký quỹ trước khi chủ bắt đầu duyệt.</li>
+                  {groupId && vnpayOn ? (
+                    <li>
+                      • Hoặc <strong>thanh toán VNPay ngay</strong> để đưa đủ tiền vào ví và đánh dấu nhóm đã thanh
+                      toán online (khuyến nghị nếu ví đang thiếu).
+                    </li>
+                  ) : null}
                 </ul>
               </div>
             </div>
           </div>
 
-          {/* ACTIONS */}
+          {canVnpayPrepay && groupId ? (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm ring-1 ring-slate-100">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-slate-900">Thanh toán trước cho nhóm đơn</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    Chuyển tới cổng <span className="font-semibold text-[#0e4194]">VNPay</span> an toàn. Sau khi thành công,
+                    tiền được <strong className="text-slate-800">cộng vào ví</strong> và nhóm đơn được đánh dấu{' '}
+                    <strong className="text-slate-800">đã thanh toán online</strong>. Khi chủ duyệt, hệ thống vẫn trừ
+                    ví theo từng đơn.
+                  </p>
+                  {payErr ? <p className="mt-2 text-sm font-medium text-red-600">{payErr}</p> : null}
+                </div>
+                <div className="flex shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white px-3 py-2">
+                  <img
+                    src={VNPAY_LOGO_URL}
+                    alt="VNPay"
+                    width={140}
+                    height={72}
+                    className="h-14 w-auto max-w-[160px] object-contain object-center"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={payBusy}
+                onClick={() => {
+                  setPayErr('');
+                  setPayBusy(true);
+                  void (async () => {
+                    try {
+                      const res = await paymentService.createBookingGroupVnpay(groupId);
+                      const url = res.data?.data?.paymentUrl;
+                      if (!url) {
+                        setPayErr('Không nhận được link thanh toán.');
+                        setPayBusy(false);
+                        return;
+                      }
+                      window.location.href = url;
+                    } catch (err: unknown) {
+                      const msg =
+                        err && typeof err === 'object' && 'response' in err
+                          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+                          : undefined;
+                      setPayErr(msg || (err instanceof Error ? err.message : 'Không tạo được thanh toán'));
+                      setPayBusy(false);
+                    }
+                  })();
+                }}
+                className="group mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-[#0e4194] bg-[#0e4194] px-5 py-3.5 text-left shadow-md transition hover:bg-[#0c3578] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[280px]"
+              >
+                {payBusy ? (
+                  <span className="material-symbols-outlined animate-spin text-[28px] text-white">progress_activity</span>
+                ) : (
+                  <span className="rounded-lg bg-white p-1.5 shadow-inner ring-1 ring-white/30">
+                    <img
+                      src={VNPAY_LOGO_URL}
+                      alt="VNPay"
+                      width={120}
+                      height={64}
+                      className="h-11 w-auto max-w-[130px] object-contain object-center"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </span>
+                )}
+                <span className="flex min-w-0 flex-col text-white">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-100/90">
+                    Thanh toán an toàn
+                  </span>
+                  <span className="text-base font-extrabold leading-tight">Tiến hành qua VNPay</span>
+                </span>
+                <span className="material-symbols-outlined text-[22px] text-white/90 transition group-hover:translate-x-0.5">
+                  arrow_forward
+                </span>
+              </button>
+            </div>
+          ) : null}
+
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
             <Link
               to="/history"
@@ -195,7 +292,6 @@ export default function BookingSuccessPage() {
             >
               Xem đơn thuê
             </Link>
-
             <Link
               to="/"
               className="flex items-center justify-center rounded-2xl bg-[#0b45b3] py-4 text-lg font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800"
@@ -205,12 +301,8 @@ export default function BookingSuccessPage() {
           </div>
         </div>
 
-        {/* SUPPORT */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          Cần hỗ trợ? Liên hệ{' '}
-          <span className="font-semibold text-[#0b45b3]">
-            support@lenslease.vn
-          </span>
+          Cần hỗ trợ? Liên hệ <span className="font-semibold text-[#0b45b3]">support@lenslease.vn</span>
         </div>
       </main>
     </div>

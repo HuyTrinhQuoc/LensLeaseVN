@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { cartService } from '../../services/cart.service';
+import api from '../../services/api';
+import { API_BASE_URL } from '../../config/api-base';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromCart = Boolean((location.state as { cartReturn?: boolean } | null)?.cartReturn);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
@@ -17,13 +21,30 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:3000/auth/login', { email, password });
+      const res = await api.post('/auth/login', { email, password });
       
+      const token = res.data.accessToken;
       // Lưu token vào localStorage
-      localStorage.setItem('token', res.data.accessToken);
+      localStorage.setItem('token', token);
       
-      // Đăng nhập thành công, chuyển hướng về trang chủ
-      navigate('/');
+      // Gộp giỏ hàng (Merge Cart)
+      try {
+        const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
+        if (localCart.length > 0) {
+          // Pass token implicitly via api interceptor or just assume it is set by Auth service.
+          // Since we just set token in localStorage, api interceptor should pick it up.
+          // Wait, api interceptor reads from getAuthToken() which reads from localStorage.
+          // So we can just call cartService.mergeCart
+          await cartService.mergeCart(localCart);
+          // Xóa giỏ hàng local sau khi đã gộp thành công
+          localStorage.removeItem('cart');
+        }
+      } catch (mergeError) {
+        console.error('Lỗi khi merge giỏ hàng:', mergeError);
+      }
+
+      // Đăng nhập thành công
+      navigate(fromCart ? '/cart' : '/');
     } catch (error: any) {
       setErrorMsg(error.response?.data?.message || 'Sai thông tin đăng nhập');
     } finally {
@@ -32,7 +53,7 @@ const Auth = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:3000/auth/google';
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (

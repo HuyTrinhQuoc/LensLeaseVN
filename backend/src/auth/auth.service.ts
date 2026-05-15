@@ -10,7 +10,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
-  ) {}
+  ) { }
 
   // 1. ĐĂNG KÝ (LOCAL) + GỬI MAIL
   async register(dto: any) {
