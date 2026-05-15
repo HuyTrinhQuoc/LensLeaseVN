@@ -1,15 +1,36 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
 import ProductGallery from "../../components/product-detail/ProductGallery";
 import BookingSidebar from "../../components/product-detail/BookingSidebar"; 
 import ProductSpecs from "../../components/product-detail/ProductSpecs";
+import ProductCard from "../../components/layout/ProductCard";
+import Pagination from "../../components/common/Pagination";
 import { ProductService } from "../../services/product.service";
+import type { ProductItem } from "../../type/product.type";
+
+interface PaginatedApiResponse {
+  message?: string;
+  data: ProductItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const RELATED_PER_PAGE = 4;
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ============== STATE CHO SẢN PHẨM LIÊN QUAN ==============
+  const [relatedItems, setRelatedItems] = useState<ProductItem[]>([]);
+  const [relatedPage, setRelatedPage] = useState(1);
+  const [relatedTotalPages, setRelatedTotalPages] = useState(1);
+  const [relatedTotal, setRelatedTotal] = useState(0);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -33,17 +54,79 @@ export default function ProductDetailPage() {
     };
 
     fetchDetail();
+    // Reset related products page khi chuyển sản phẩm
+    setRelatedPage(1);
   }, [id]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500 font-medium">Đang tải dữ liệu...</div>;
-  if (error || !product) return <div className="min-h-screen flex items-center justify-center text-red-500 font-medium">{error || "Không tìm thấy thiết bị!"}</div>;
+  // Fetch sản phẩm liên quan (cùng brand hoặc category)
+  const fetchRelated = useCallback(async () => {
+    if (!product) return;
+
+    setRelatedLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append("page", relatedPage.toString());
+      params.append("limit", RELATED_PER_PAGE.toString());
+      
+      // Lọc theo category nếu có, fallback theo brand
+      if (product.category?.id) {
+        params.append("category", product.category.id);
+      } else if (product.brand) {
+        params.append("brand", product.brand);
+      }
+
+      const res = await fetch(`http://localhost:3000/lenses?${params.toString()}`);
+      const data: PaginatedApiResponse = await res.json();
+
+      // Loại bỏ sản phẩm hiện tại khỏi danh sách liên quan
+      const filtered = (data.data || []).filter((item) => item.id !== id);
+      setRelatedItems(filtered);
+      // Điều chỉnh totalPages nếu cần (vì đã loại bỏ 1 item)
+      setRelatedTotalPages(data.totalPages || 1);
+      setRelatedTotal(Math.max(0, (data.total || 0) - 1));
+    } catch (err) {
+      console.error("Lỗi khi tải sản phẩm liên quan:", err);
+    } finally {
+      setRelatedLoading(false);
+    }
+  }, [product, relatedPage, id]);
+
+  useEffect(() => {
+    fetchRelated();
+  }, [fetchRelated]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <span className="text-gray-500 font-medium">Đang tải dữ liệu...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+        <div className="text-center space-y-4">
+          <div className="text-6xl">😔</div>
+          <p className="text-red-500 font-medium text-lg">{error || "Không tìm thấy thiết bị!"}</p>
+          <Link to="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+            ← Quay lại danh sách
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f8f9fa] min-h-screen pb-24 pt-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Bố cục chia tỷ lệ 65% (Trái) - 35% (Phải) */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative">
+        {/* Cột phải kéo cao bằng cột trái (lg:items-stretch) để sticky có vùng bám — không bị cuộn mất theo nội dung dài. */}
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-stretch lg:gap-12 relative">
           
           {/* ================= CỘT TRÁI ================= */}
           <div className="w-full lg:w-[65%] space-y-10">
@@ -88,7 +171,6 @@ export default function ProductDetailPage() {
                </div>
                              </div>
 
-               {/* Dữ liệu giả lập cho phần review giống UI, bạn có thể map dữ liệu thật sau */}
                <div className="space-y-4">
                  {[1, 2].map((item) => (
                   <div key={item} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -109,17 +191,101 @@ export default function ProductDetailPage() {
           </div>
 
           {/* ================= CỘT PHẢI ================= */}
-          <div className="w-full lg:w-[35%]">
-            <BookingSidebar 
-              pricePerDay={Number(product.price_per_day)} 
-              available={product.available} 
-            />
-            
+          <div className="w-full shrink-0 lg:flex lg:w-[35%] lg:flex-col lg:min-h-0">
+            <div className="lg:sticky lg:top-6 lg:z-20 lg:self-start lg:w-full">
+              <BookingSidebar
+                lensId={product.id}
+                pricePerDay={Number(product.price_per_day)}
+                available={product.available !== false && !product.is_deleted}
+                depositAmount={Number(product.required_deposit_amount)}
+                marketValue={product.market_value ? Number(product.market_value) : undefined}
+                lensMeta={{
+                  title: product.title,
+                  image_url:
+                    product.images?.[0]?.image_url || product.thumbnail || undefined,
+                  brand: product.brand || undefined,
+                  category_name: product.category?.name,
+                  owner_name: product.owner?.full_name,
+                  owner_rating:
+                    product.owner?.rating_avg != null ? Number(product.owner.rating_avg) : product.rating_avg != null
+                      ? Number(product.rating_avg)
+                      : undefined,
+                  allowed_deposit_types: Array.isArray(product.allowed_deposit_types)
+                    ? [...product.allowed_deposit_types]
+                    : undefined,
+                  required_deposit_amount: product.required_deposit_amount != null
+                    ? Number(product.required_deposit_amount)
+                    : undefined,
+                }}
+              />
+            </div>
           </div>
 
           
 
         </div>
+
+        {/* ================= SẢN PHẨM LIÊN QUAN ================= */}
+        <section className="mt-20">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4 mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                Thiết bị liên quan
+              </h2>
+              <p className="text-gray-500 mt-2">
+                Các thiết bị tương tự bạn có thể quan tâm
+                {!relatedLoading && relatedTotal > 0 && (
+                  <span className="ml-2 text-sm text-blue-600 font-medium">
+                    ({relatedTotal} thiết bị)
+                  </span>
+                )}
+              </p>
+            </div>
+            <Link
+              to="/products"
+              className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group"
+            >
+              Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
+            </Link>
+          </div>
+
+          {relatedLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: RELATED_PER_PAGE }).map((_, i) => (
+                <div key={i} className="animate-pulse bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="aspect-[4/3] bg-gray-200" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-100 rounded w-1/2" />
+                    <div className="h-4 bg-gray-100 rounded w-1/3 mt-4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : relatedItems.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
+              Chưa có thiết bị liên quan nào.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {relatedItems.map((item) => (
+                  <ProductCard key={item.id} item={item} />
+                ))}
+              </div>
+
+              {/* Phân trang sản phẩm liên quan */}
+              <div className="mt-8">
+                <Pagination
+                  currentPage={relatedPage}
+                  totalPages={relatedTotalPages}
+                  onPageChange={(p) => setRelatedPage(p)}
+                />
+              </div>
+            </>
+          )}
+        </section>
+
       </div>
     </div>
   );

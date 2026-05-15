@@ -1,58 +1,98 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
-import DashboardLayout from '../components/layout/DashboardLayout';
+import ProfileDashboardLayout from '../components/layout/ProfileDashboardLayout';
 
-// Pages
+// Pages — Public / Renter
 import HomePage from '../pages/Home/HomePage';
 import CartPage from '../pages/Cart/CartPage';
-import LenderOrdersPage from '../pages/Lender/Orders';
 import ProductsPage from '../pages/Products/ProductsPage';
 import ProductDetailPage from '../pages/ProductDetail/ProductDetailPage';
-
 import WalletPage from '../pages/Wallet/WalletPage';
+import WalletTopupResultPage from '../pages/Wallet/WalletTopupResultPage';
+import AboutPage from '../pages/About/AboutPage';
+import NewsPage from '../pages/News/NewsPage';
+import ContactPage from '../pages/Contact/ContactPage';
 
 import LoginSuccess from '../pages/Login/GoogleSuccess';
 import Auth from '../pages/Login/Auth';
 import Register from '../pages/Login/Register';
 
-//chưa xử lí backend
 import BookingPage from '../pages/BookingSchedule/Booking';
 import VerificationPage from '../pages/Checkout/Verification';
 import CheckoutPage from '../pages/Checkout/CheckoutPage';
 import BookingSuccessPage from '../pages/Checkout/SuccessPage';
+import BookingPaymentResultPage from '../pages/Checkout/BookingPaymentResultPage';
 import BookingHistoryPage from '../pages/History/HistoryPage';
+import BookingDetailPage from '../pages/BookingDetail/BookingDetailPage';
 import ChatPage from '../pages/Chat/ChatPage';
 
+// Pages — Dashboard (Profile / Lender)
+import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
+import DashboardMyListingsPage from '../pages/Dashboard/DashboardMyListingsPage';
+import DashboardStatsPage from '../pages/Dashboard/DashboardStatsPage';
+
 /**
- * AppRoutes — Cấu hình định tuyến chính của ứng dụng phân chia theo Role.
+ * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
+ *
+ * Cấu trúc:
+ *  /              — MainLayout (Header/Footer) cho trang Renter / Guest
+ *  /dashboard/*   — ProfileDashboardLayout (Sidebar + Topbar) cho User Profile
+ *  /login, etc.   — Standalone auth pages
  */
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* ── USER ROUTES (Renter / Guest) ── */}
+      {/* ══════════════════════════════════════════════
+          USER ROUTES (Renter / Guest) — MainLayout
+          ══════════════════════════════════════════════ */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/Verification" element={<VerificationPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
-         <Route path="/products" element={<ProductsPage />} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/:id" element={<ProductDetailPage />} />
         <Route path="/wallet" element={<WalletPage />} />
-         <Route path="/booking" element={<BookingPage />} />
-          <Route path="/success" element={<BookingSuccessPage />} />
-          <Route path="/history" element={<BookingHistoryPage />} />
-          <Route path="/chat" element={<ChatPage />} />
+        <Route path="/wallet/topup/result" element={<WalletTopupResultPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/news" element={<NewsPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/booking" element={<BookingPage />} />
+        <Route path="/success" element={<BookingSuccessPage />} />
+        <Route path="/bookings/payment-result" element={<BookingPaymentResultPage />} />
+        <Route path="/history" element={<BookingHistoryPage />} />
+        <Route path="/bookings/:id" element={<BookingDetailPage />} />
+        <Route path="/chat" element={<ChatPage />} />
       </Route>
 
-      {/* ── LENDER ROUTES (Chủ thiết bị) ── */}
-      <Route path="/lender" element={<DashboardLayout />}>
-        <Route path="orders" element={<LenderOrdersPage />} />
-        {/* Thêm các route khác của Lender ở đây */}
-      </Route>
-      
-      {/* ── ADMIN ROUTES ── */}
-      {/* Cấu trúc tương tự DashboardLayout nhưng dành cho Admin */}
+      {/* ══════════════════════════════════════════════
+          DASHBOARD — ProfileDashboardLayout
+          Sidebar trái (Renter + Lender) + Topbar + Content
+          ══════════════════════════════════════════════ */}
+      <Route path="/dashboard" element={<ProfileDashboardLayout />}>
+        {/* Mặc định vào "Đơn cho thuê" */}
+        <Route index element={<Navigate to="orders" replace />} />
 
+        {/* Lender pages */}
+        <Route path="orders" element={<DashboardOrdersPage />} />
+        <Route path="wallet" element={<WalletPage />} />
+        <Route path="wallet/topup/result" element={<WalletTopupResultPage />} />
+        <Route path="my-listings" element={<DashboardMyListingsPage />} />
+        <Route path="stats" element={<DashboardStatsPage />} />
+
+        {/* Reuse existing NewListingPage nếu có */}
+        {/* <Route path="new-listing" element={<NewListingPage />} /> */}
+      </Route>
+
+      {/* ══════════════════════════════════════════════
+          LEGACY LENDER ROUTES (redirect to new dashboard)
+          ══════════════════════════════════════════════ */}
+      <Route path="/lender" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/lender/*" element={<Navigate to="/dashboard" replace />} />
+
+      {/* ══════════════════════════════════════════════
+          AUTH PAGES (Standalone — no layout)
+          ══════════════════════════════════════════════ */}
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login-success" element={<LoginSuccess />} />

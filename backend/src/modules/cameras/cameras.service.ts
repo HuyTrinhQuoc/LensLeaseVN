@@ -20,12 +20,20 @@ export class CamerasService {
       minPrice,
       maxPrice,
       minRating,
+      owner_id,
     } = query;
 
     const where: any = {
       is_deleted: false,
-      approval_status: 'APPROVED',
     };
+    
+    if (owner_id) {
+      // Chủ máy xem thiết bị của mình, hiển thị cả chưa duyệt
+      where.owner_id = owner_id;
+    } else {
+      // Khách hàng xem: chỉ hiển thị thiết bị Đã Duyệt
+      where.approval_status = 'APPROVED';
+    }
 
     // ======================
     // CATEGORY

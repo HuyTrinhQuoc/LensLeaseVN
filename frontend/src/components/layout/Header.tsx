@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useCart } from '../../context/CartContext';
 import '../../styles/shared-layout.css';
 
 function Icon({ name, className = '' }: { name: string; className?: string }) {
@@ -12,6 +13,7 @@ function Icon({ name, className = '' }: { name: string; className?: string }) {
 }
 
 export default function Header() {
+  const { totalItems } = useCart();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -27,14 +29,29 @@ export default function Header() {
 
   // Kiểm tra trạng thái đăng nhập khi component mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedName = localStorage.getItem('userName');
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     
     if (token) {
       setIsLoggedIn(true);
-      setUserName(savedName || 'Người dùng'); // Fallback nếu không có tên
+      // Gọi API lấy thông tin user thật
+      import('../../services/user.service').then(({ userService }) => {
+        userService.getMe()
+          .then(res => {
+            if (res.data) {
+              setUserName(res.data.full_name || 'Người dùng');
+              localStorage.setItem('userName', res.data.full_name || 'Người dùng');
+              if (res.data.avatar_url) {
+                localStorage.setItem('avatar_url', res.data.avatar_url);
+              }
+            }
+          })
+          .catch(() => {
+            const savedName = localStorage.getItem('userName');
+            setUserName(savedName || 'Người dùng');
+          });
+      });
     }
-  }, [location.pathname]); // Cập nhật lại nếu chuyển trang (ví dụ sau khi login xong)
+  }, [location.pathname]);
 
   // Xử lý click ra ngoài để đóng User Menu
   useEffect(() => {
@@ -204,12 +221,20 @@ export default function Header() {
                     }}
                   >
                     <Link 
-                      to="/profile" 
+                      to="/dashboard" 
                       style={{ display: 'block', padding: '10px 16px', color: '#333', textDecoration: 'none', fontSize: '14px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       Hồ sơ của tôi
+                    </Link>
+                    <Link 
+                      to="/dashboard/orders" 
+                      style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      Quản lý cho thuê
                     </Link>
                     <button 
                       onClick={handleLogout}
@@ -240,7 +265,7 @@ export default function Header() {
             <Link to="/cart" className="dark-header__cart-btn">
               <div className="dark-header__cart-icon-wrapper">
                 <Icon name="shopping_basket" />
-                <span className="dark-header__cart-badge">0</span>
+                <span className="dark-header__cart-badge">{totalItems}</span>
               </div>
               <span>Giỏ hàng</span>
             </Link>

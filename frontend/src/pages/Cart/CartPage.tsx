@@ -1,12 +1,29 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/cart.css';
+import { getAuthToken } from '../../utils/auth';
+import { cartService } from '../../services/cart.service';
+import { toDateOnlyStringLocal, parseDateOnlyLocal, calculateRentalDaysLocal, ymdFromApiDateField } from '../../utils/date-only';
+import { platformFeeFromSubtotal, rentalLineSubtotal } from '../../utils/pricing';
+import LensRentalSchedulePanel from '../../components/scheduling/LensRentalSchedulePanel';
+import {
+  readGuestCart,
+  isGuestCartLineId,
+  lensIdFromGuestLineId,
+  removeGuestCartByLensId,
+  clearGuestCart,
+  updateGuestCartDates,
+  guestLineId,
+  type GuestCartStoredItem,
+} from '../../utils/guest-cart';
+import { useCart } from '../../context/CartContext';
 
 /* ────────────────────────────────────────────
    Types
    ──────────────────────────────────────────── */
 interface CartItem {
-  id: string;
+  id: string; // cart item id
+  lensId: string; // lens id required for booking
   name: string;
   brand: string;
   category: string;
@@ -24,70 +41,42 @@ interface CartItem {
   ownerName: string;
   ownerAvatar?: string;
   ownerRating?: number;
+  /** Giao của các `DepositType` lens cho phép — dùng ở checkout. */
+  allowedDepositTypes: string[];
 }
 
-/* ────────────────────────────────────────────
-   Mock Data
-   ──────────────────────────────────────────── */
-const initialCartItems: CartItem[] = [
-  {
-    id: 'LL-001',
-    name: 'Sony Alpha A7 IV + FE 24-70mm f/2.8 GM',
-    brand: 'Sony',
-    category: 'Máy ảnh & Ống kính',
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCr4Wzm6DlzaPaPltjeEdBxG8_OxrXPzLblDd_vJuwEFk2OZmea0Z6MORmwvm8cBMfi3hSzDmwUBdm77N2B48F1_ovWBI3yo0lxrLpQYSGv58yKZLzF6JvLyCVXNkLTHI7l8ExGQtTNoZ1WN3aupNVx5dIlLfjcGkUFBKyCuadLsXWL9nwghC3SxxKVeXYL9_la4ok0cSvyKpDOah7aVJn3AyPsOO_tJYXaQAL6a0QvgRoVaufoPfS4XEHrlWaBQOZbqxSymkCm2MI',
-    pricePerDay: 850000,
-    rentalDays: 5,
-    startDate: '2024-05-15',
-    endDate: '2024-05-20',
-    quantity: 1,
-    deposit: 5000000,
-    accessories: ['Pin NP-FZ100 x2', 'Sạc rời', 'Thẻ nhớ SD 128GB'],
-    condition: 'Mới',
-    available: true,
-    ownerName: 'Trần Văn A',
-ownerAvatar: 'https://i.pravatar.cc/40',
-ownerRating: 4.8,
-  },
-  {
-    id: 'LL-002',
-    name: 'Canon EOS R5 (Body Only)',
-    brand: 'Canon',
-    category: 'Máy ảnh',
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBP-oR8imkp_p4qhEkVvZFSZ4qOLR5eq4MJMvU00c68wN1Or3ih-GevKPLo6YSEStNlw4l7hkjorSE2r6ZEltEeT9_0U3Qu3ECIu-n-3KsH358mEyHk2-Yu8ReZOyMvfSrbmNBg9EbVJjky6aw-5q6MEFrVMKGfcQ2W_ne7MG3st3wStmeOMHBSW4CvJsTHhbENFFFs0CLTa5Ps03ttP1jKNQ-79jYez5zfEUPG5yzDdx0g0bvY9uZ3TqwrbrbGAHIgzDEZSUaI6_0',
-    pricePerDay: 1200000,
-    rentalDays: 3,
-    startDate: '2024-05-18',
-    endDate: '2024-05-21',
-    quantity: 1,
-    deposit: 8000000,
-    accessories: ['Pin LP-E6NH x1', 'Dây đeo'],
+const PLACEHOLDER_IMG = 'https://placehold.co/120x120/e2e8f0/64748b?text=Lens';
+const DEFAULT_DEPOSIT_TYPES = ['MONEY_PLATFORM', 'MONEY_DIRECT', 'PAPERWORK'] as const;
+
+function guestRowToCartPageItem(r: GuestCartStoredItem): CartItem {
+  const deposit =
+    r.required_deposit_amount != null && Number.isFinite(Number(r.required_deposit_amount))
+      ? Number(r.required_deposit_amount)
+      : 0;
+  return {
+    id: guestLineId(r.lens_id),
+    lensId: r.lens_id,
+    name: r.title || 'Thiết bị',
+    brand: r.brand || 'Khác',
+    category: r.category_name || 'Máy ảnh & Ống kính',
+    imageUrl: r.image_url || PLACEHOLDER_IMG,
+    pricePerDay: Number(r.price_per_day ?? 0),
+    rentalDays: calculateRentalDaysLocal(r.start_date, r.end_date),
+    startDate: r.start_date,
+    endDate: r.end_date,
+    quantity: r.quantity,
+    deposit,
+    accessories: [],
     condition: 'Tốt',
     available: true,
-    ownerName: 'Trần Văn A',
-ownerAvatar: 'https://i.pravatar.cc/40',
-ownerRating: 4.8,
-  },
-  {
-    id: 'LL-003',
-    name: 'DJI RS 3 Pro Gimbal Stabilizer',
-    brand: 'DJI',
-    category: 'Phụ kiện quay',
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCR5LtsUHiOWqGr_xIqqyMf-gW1Sn3SN0eSNCWezt6kve0SMPHP3ervqk3CGqadyoLWnovU_fiS_4xCdbGT4cHArUbqVM-ECcNSc8N81dwzstlho9GHhttEEM8t2gujYjqNcbyqmMilxE07kzyqP3PbWrNqSGdMg43odZouqZU4iNUSTX0PHRFN3x4pAbUEz5dVR7eeOuV5I8X7TY0W8jvqwJjJloejqx93N_2T5YSxOTAMXiA9efgeiB8KgbhZPT7pBXIHg7jWNbE',
-    pricePerDay: 450000,
-    rentalDays: 2,
-    startDate: '2024-05-16',
-    endDate: '2024-05-18',
-    quantity: 1,
-    deposit: 3000000,
-    accessories: ['Tay cầm mở rộng', 'Túi đựng'],
-    condition: 'Khá',
-    available: true,
-    ownerName: 'Trần Văn A',
-ownerAvatar: 'https://i.pravatar.cc/40',
-ownerRating: 4.8,
-  },
-];
+    ownerName: r.owner_name || 'Chủ thiết bị',
+    ownerRating: r.owner_rating,
+    allowedDepositTypes:
+      Array.isArray(r.allowed_deposit_types) && r.allowed_deposit_types.length > 0
+        ? [...r.allowed_deposit_types]
+        : [...DEFAULT_DEPOSIT_TYPES],
+  };
+}
 
 /* ────────────────────────────────────────────
    Utility helpers
@@ -97,11 +86,10 @@ function formatCurrency(amount: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDate();
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
-  return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+  if (!dateStr) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr.trim());
+  if (!m) return '';
+  return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
 function getConditionBadge(condition: string) {
@@ -116,7 +104,7 @@ function getConditionBadge(condition: string) {
 }
 
 /* ────────────────────────────────────────────
-   Icon helper (same pattern as OverviewPage)
+   Icon helper
    ──────────────────────────────────────────── */
 function Icon({ name, filled = false, className = '' }: { name: string; filled?: boolean; className?: string }) {
   return (
@@ -138,10 +126,84 @@ function Icon({ name, filled = false, className = '' }: { name: string; filled?:
    ──────────────────────────────────────────── */
 export default function CartPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<CartItem[]>(initialCartItems);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(items.map((i) => i.id)));
+  const { refreshCart } = useCart();
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  // ── Fetch Cart from API ──
+  const fetchCart = useCallback(async () => {
+    if (!getAuthToken()) {
+      setLoading(true);
+      try {
+        const mapped = readGuestCart().map(guestRowToCartPageItem);
+        setItems(mapped);
+        setSelectedItems((prev) => {
+          const next = new Set<string>();
+          for (const id of prev) {
+            if (mapped.some((i) => i.id === id)) next.add(id);
+          }
+          return next;
+        });
+      } finally {
+        setLoading(false);
+        void refreshCart();
+      }
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await cartService.getCart();
+      const json = res.data as { data?: { items_by_owner?: unknown[] } };
+
+      if (json.data && json.data.items_by_owner) {
+        const flatItems: CartItem[] = [];
+        (json.data.items_by_owner as any[]).forEach((group: any) => {
+          group.items.forEach((item: any) => {
+            const startYmd = ymdFromApiDateField(item.start_date);
+            const endYmd = ymdFromApiDateField(item.end_date);
+            flatItems.push({
+              id: item.id,
+              lensId: item.lens_id,
+              name: item.lens.title,
+              brand: item.lens.brand || 'Khác',
+              category: item.lens.category?.name || 'Máy ảnh & Ống kính',
+              imageUrl: item.lens.images?.[0]?.image_url || item.lens.images?.[0]?.url || item.lens.thumbnail || PLACEHOLDER_IMG,
+              pricePerDay: Number(item.lens.price_per_day),
+              rentalDays: calculateRentalDaysLocal(startYmd, endYmd),
+              startDate: startYmd,
+              endDate: endYmd,
+              quantity: item.quantity,
+              deposit: Number(item.lens.required_deposit_amount || 0),
+              accessories: [],
+              condition: 'Tốt', // Placeholder
+              available: item.is_available,
+              ownerName: group.owner.full_name,
+              ownerRating: group.owner.rating_avg,
+              allowedDepositTypes: Array.isArray(item.lens?.allowed_deposit_types)
+                ? [...item.lens.allowed_deposit_types]
+                : ['MONEY_PLATFORM', 'MONEY_DIRECT', 'PAPERWORK'],
+            });
+          });
+        });
+        setItems(flatItems);
+        // Mặc định chọn tất cả các sản phẩm khả dụng
+        setSelectedItems((prev) => {
+          if (prev.size > 0) return prev;
+          return new Set(flatItems.filter((i) => i.available).map((i) => i.id));
+        });
+        void refreshCart();
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải giỏ hàng:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshCart]);
+
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   // ── Toggle item selection ──
   const toggleSelect = useCallback((id: string) => {
@@ -155,55 +217,154 @@ export default function CartPage() {
 
   const toggleSelectAll = useCallback(() => {
     setSelectedItems((prev) => {
-      if (prev.size === items.length) return new Set();
-      return new Set(items.map((i) => i.id));
+      const availableItems = items.filter(i => i.available);
+      if (prev.size === availableItems.length) return new Set();
+      return new Set(availableItems.map((i) => i.id));
     });
   }, [items]);
 
-  // ── Rental days controls ──
-  const updateDays = useCallback((id: string, delta: number) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const newDays = Math.max(1, Math.min(30, item.rentalDays + delta));
-        // Recalculate end date
-        const start = new Date(item.startDate);
+  // ── Rental days controls (Call PATCH API) ──
+  const updateDays = useCallback(
+    async (id: string, delta: number) => {
+      if (isGuestCartLineId(id)) {
+        const lensId = lensIdFromGuestLineId(id);
+        if (!lensId) return;
+        const row = readGuestCart().find((r) => r.lens_id === lensId);
+        if (!row) return;
+        const newDays = Math.max(1, Math.min(30, calculateRentalDaysLocal(row.start_date, row.end_date) + delta));
+        const start = parseDateOnlyLocal(row.start_date);
+        if (Number.isNaN(start.getTime())) {
+          void fetchCart();
+          return;
+        }
         const end = new Date(start);
-        end.setDate(start.getDate() + newDays);
-        return {
-          ...item,
-          rentalDays: newDays,
-          endDate: end.toISOString().split('T')[0],
-        };
-      }),
-    );
-  }, []);
+        end.setUTCDate(start.getUTCDate() + newDays);
+        const newEndDateStr = toDateOnlyStringLocal(end);
+        updateGuestCartDates(lensId, { end_date: newEndDateStr });
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id ? { ...i, rentalDays: newDays, endDate: newEndDateStr } : i,
+          ),
+        );
+        void refreshCart();
+        return;
+      }
 
-  // ── Remove item ──
-  const removeItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
 
-  // ── Apply coupon ──
-  const handleApplyCoupon = () => {
-    if (couponCode.trim().length > 0) {
-      setCouponApplied(true);
+      const newDays = Math.max(1, Math.min(30, item.rentalDays + delta));
+      const start = parseDateOnlyLocal(item.startDate);
+      if (Number.isNaN(start.getTime())) {
+        void fetchCart();
+        return;
+      }
+      const end = new Date(start);
+      end.setUTCDate(start.getUTCDate() + newDays);
+      const newEndDateStr = toDateOnlyStringLocal(end);
+
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, rentalDays: newDays, endDate: newEndDateStr } : i)),
+      );
+
+      try {
+        await cartService.updateItem(id, { end_date: newEndDateStr });
+      } catch (error) {
+        console.error('Lỗi cập nhật ngày thuê:', error);
+        void fetchCart();
+      }
+    },
+    [items, fetchCart, refreshCart],
+  );
+
+  // ── Remove item (Call DELETE API) ──
+  const removeItem = useCallback(
+    async (id: string) => {
+      if (isGuestCartLineId(id)) {
+        const lid = lensIdFromGuestLineId(id);
+        if (lid) removeGuestCartByLensId(lid);
+        setItems((prev) => prev.filter((item) => item.id !== id));
+        setSelectedItems((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        void refreshCart();
+        return;
+      }
+
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+
+      try {
+        await cartService.removeItem(id);
+      } catch (error) {
+        console.error('Lỗi khi xóa sản phẩm:', error);
+        void fetchCart();
+      }
+    },
+    [fetchCart, refreshCart],
+  );
+
+  // ── Xóa các item đã chọn (Gọi API xóa từng cái hoặc xóa trắng giỏ) ──
+  const removeSelectedItems = async () => {
+    if (!getAuthToken()) {
+      if (selectedItems.size === items.length && items.length > 0) {
+        clearGuestCart();
+        setItems([]);
+        setSelectedItems(new Set());
+        void refreshCart();
+      } else {
+        for (const id of Array.from(selectedItems)) {
+          await removeItem(id);
+        }
+      }
+      return;
+    }
+
+    if (selectedItems.size === items.length) {
+      try {
+        await cartService.clearCart();
+        setItems([]);
+        setSelectedItems(new Set());
+        void refreshCart();
+      } catch (error) {
+        console.error('Lỗi xóa toàn bộ giỏ hàng:', error);
+      }
+    } else {
+      for (const id of Array.from(selectedItems)) {
+        await removeItem(id);
+      }
     }
   };
 
-  // ── Calculations ──
+  // ── Tổng tiền khớp backend: tiền thuê + phí sàn 8% / dòng; ký quỹ trừ khi chủ duyệt ──
   const selectedItemsList = items.filter((i) => selectedItems.has(i.id));
-  const subtotal = selectedItemsList.reduce((sum, i) => sum + i.pricePerDay * i.rentalDays * i.quantity, 0);
-  const totalDeposit = selectedItemsList.reduce((sum, i) => sum + i.deposit, 0);
-  const discount = couponApplied ? Math.round(subtotal * 0.1) : 0;
-  const serviceFee = Math.round(subtotal * 0.05);
-  const grandTotal = subtotal - discount + serviceFee;
+  const subtotal = selectedItemsList.reduce(
+    (sum, i) => sum + rentalLineSubtotal(i.pricePerDay, i.rentalDays, i.quantity),
+    0,
+  );
+  const platformFeeTotal = selectedItemsList.reduce(
+    (sum, i) =>
+      sum + platformFeeFromSubtotal(rentalLineSubtotal(i.pricePerDay, i.rentalDays, i.quantity)),
+    0,
+  );
+  const totalDeposit = selectedItemsList.reduce((sum, i) => sum + i.deposit * i.quantity, 0);
+  const rentalPlusPlatform = subtotal + platformFeeTotal;
+  const totalWhenOwnersConfirm = rentalPlusPlatform + totalDeposit;
   const totalItems = selectedItemsList.length;
+
+  if (loading) {
+    return (
+      <div className="cart-page-wrapper" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <p>Đang tải giỏ hàng...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="cart-page-wrapper">
@@ -236,7 +397,7 @@ export default function CartPage() {
                 <label className="cart-select-bar__check">
                   <input
                     type="checkbox"
-                    checked={selectedItems.size === items.length && items.length > 0}
+                    checked={selectedItems.size === items.filter(i => i.available).length && items.length > 0}
                     onChange={toggleSelectAll}
                   />
                   <span>Chọn tất cả ({items.length} sản phẩm)</span>
@@ -244,10 +405,7 @@ export default function CartPage() {
                 {selectedItems.size > 0 && (
                   <button
                     className="cart-select-bar__remove"
-                    onClick={() => {
-                      setItems((prev) => prev.filter((i) => !selectedItems.has(i.id)));
-                      setSelectedItems(new Set());
-                    }}
+                    onClick={removeSelectedItems}
                   >
                     <Icon name="delete_sweep" />
                     Xoá đã chọn ({selectedItems.size})
@@ -263,7 +421,7 @@ export default function CartPage() {
                   </div>
                   <h3>Giỏ hàng trống</h3>
                   <p>Bạn chưa thêm thiết bị nào vào giỏ hàng.</p>
-                  <button className="cart-btn-primary cart-btn-primary--lg">
+                  <button className="cart-btn-primary cart-btn-primary--lg" onClick={() => navigate('/products')}>
                     <Icon name="explore" />
                     Khám phá thiết bị
                   </button>
@@ -273,8 +431,8 @@ export default function CartPage() {
                   {items.map((item, index) => (
                     <article
                       key={item.id}
-                      className={`cart-item ${selectedItems.has(item.id) ? 'is-selected' : ''}`}
-                      style={{ animationDelay: `${index * 0.08}s` }}
+                      className={`cart-item ${selectedItems.has(item.id) ? 'is-selected' : ''} ${!item.available ? 'is-unavailable' : ''}`}
+                      style={{ animationDelay: `${index * 0.08}s`, opacity: item.available ? 1 : 0.5 }}
                     >
                       {/* Checkbox */}
                       <div className="cart-item__check">
@@ -282,15 +440,22 @@ export default function CartPage() {
                           type="checkbox"
                           checked={selectedItems.has(item.id)}
                           onChange={() => toggleSelect(item.id)}
+                          disabled={!item.available}
                         />
                       </div>
 
                       {/* Image */}
                       <div className="cart-item__image">
                         <img src={item.imageUrl} alt={item.name} />
-                        <span className={`cart-badge ${getConditionBadge(item.condition)}`}>
-                          {item.condition}
-                        </span>
+                        {item.available ? (
+                           <span className={`cart-badge ${getConditionBadge(item.condition)}`}>
+                             {item.condition}
+                           </span>
+                        ) : (
+                           <span className="cart-badge" style={{ background: '#ef4444' }}>
+                             Hết hàng
+                           </span>
+                        )}
                       </div>
 
                       {/* Content */}
@@ -298,13 +463,13 @@ export default function CartPage() {
                         <div className="cart-item__top">
                           <div className="cart-item__info">
                             <span className="cart-item__category">
-                              <Icon name="category" />
-                              {item.category}
+                              <Icon name="storefront" />
+                              Chủ máy: {item.ownerName}
                             </span>
                             <h3 className="cart-item__name">{item.name}</h3>
                             <p className="cart-item__brand">
-                              <Icon name="storefront" />
-                              {item.brand} · Mã: {item.id}
+                              <Icon name="camera" />
+                              {item.brand}
                             </p>
                           </div>
                           <button
@@ -314,16 +479,6 @@ export default function CartPage() {
                           >
                             <Icon name="close" />
                           </button>
-                        </div>
-
-                        {/* Accessories */}
-                        <div className="cart-item__accessories">
-                          {item.accessories.map((acc) => (
-                            <span key={acc} className="cart-item__accessory-tag">
-                              <Icon name="check_circle" />
-                              {acc}
-                            </span>
-                          ))}
                         </div>
 
                         {/* Bottom row: dates + price + days */}
@@ -351,7 +506,7 @@ export default function CartPage() {
                               <button
                                 onClick={() => updateDays(item.id, -1)}
                                 className="cart-item__days-btn"
-                                disabled={item.rentalDays <= 1}
+                                disabled={item.rentalDays <= 1 || !item.available}
                               >
                                 <Icon name="remove" />
                               </button>
@@ -361,7 +516,7 @@ export default function CartPage() {
                               <button
                                 onClick={() => updateDays(item.id, 1)}
                                 className="cart-item__days-btn"
-                                disabled={item.rentalDays >= 30}
+                                disabled={item.rentalDays >= 30 || !item.available}
                               >
                                 <Icon name="add" />
                               </button>
@@ -369,11 +524,22 @@ export default function CartPage() {
                             <div className="cart-item__price">
                               <span className="cart-item__price-unit">{formatCurrency(item.pricePerDay)}/ngày</span>
                               <span className="cart-item__price-total">
-                                {formatCurrency(item.pricePerDay * item.rentalDays)}
+                                {formatCurrency(rentalLineSubtotal(item.pricePerDay, item.rentalDays, item.quantity))}
                               </span>
                             </div>
                           </div>
                         </div>
+                        <LensRentalSchedulePanel
+                          lensId={item.lensId}
+                          startDate={item.startDate}
+                          endDate={item.endDate}
+                          quantity={item.quantity}
+                          productDetailHref={`/products/${item.lensId}`}
+                          variant="compact"
+                          collapsible
+                          defaultOpen={false}
+                          className="!shadow-none"
+                        />
                       </div>
                     </article>
                   ))}
@@ -416,7 +582,7 @@ export default function CartPage() {
                           </p>
                         </div>
                         <span className="cart-summary-item__total">
-                          {formatCurrency(item.pricePerDay * item.rentalDays)}
+                          {formatCurrency(rentalLineSubtotal(item.pricePerDay, item.rentalDays, item.quantity))}
                         </span>
                       </div>
                     ))}
@@ -433,27 +599,17 @@ export default function CartPage() {
                   </div>
                   <div className="cart-summary-card__row">
                     <span>
-                      Phí dịch vụ
-                      <button className="cart-summary-card__info-btn" title="5% phí nền tảng">
+                      Phí sàn (8%)
+                      <button
+                        className="cart-summary-card__info-btn"
+                        title="Khớp backend: 8% trên tiền thuê từng dòng, làm tròn 2 chữ số"
+                      >
                         <Icon name="info" />
                       </button>
                     </span>
-                    <span>{formatCurrency(serviceFee)}</span>
+                    <span>{formatCurrency(platformFeeTotal)}</span>
                   </div>
-                  {couponApplied && (
-                    <div className="cart-summary-card__row cart-summary-card__row--discount">
-                      <span>
-                        <Icon name="sell" />
-                        Giảm giá (10%)
-                      </span>
-                      <span>-{formatCurrency(discount)}</span>
-                    </div>
-                  )}
                 </div>
-
-                <div className="cart-summary-card__divider" />
-
-               
 
                 <div className="cart-summary-card__divider" />
 
@@ -473,24 +629,33 @@ export default function CartPage() {
                 {/* Grand total */}
                 <div className="cart-summary-card__total">
                   <div className="cart-summary-card__total-row">
-                    <span>Tổng thanh toán</span>
-                    <span className="cart-summary-card__total-value">{formatCurrency(grandTotal)}</span>
+                    <span>Tiền thuê + phí sàn (dự kiến)</span>
+                    <span className="cart-summary-card__total-value">{formatCurrency(rentalPlusPlatform)}</span>
                   </div>
                   <p className="cart-summary-card__total-note">
-                    (Chưa bao gồm tiền ký quỹ {formatCurrency(totalDeposit)})
+                    Khi chủ máy duyệt đơn: trừ ví thêm ký quỹ {formatCurrency(totalDeposit)} (nếu chọn cọc nền
+                    tảng). Tổng tối đa một lượt: {formatCurrency(totalWhenOwnersConfirm)}.
                   </p>
                 </div>
 
                 {/* Checkout button */}
-                <button 
-                  className="cart-btn-checkout" 
+                <button
+                  className="cart-btn-checkout"
                   disabled={selectedItemsList.length === 0}
-                  onClick={() => navigate('/Verification')}
+                  onClick={() => {
+                    if (!getAuthToken()) {
+                      navigate('/login', { state: { cartReturn: true } });
+                      return;
+                    }
+                    navigate('/checkout', { state: { selectedItems: selectedItemsList } });
+                  }}
                 >
                   <Icon name="shopping_cart_checkout" />
-                  Tiến hành thanh toán
+                  Tiến hành đặt thuê
                   {selectedItemsList.length > 0 && (
-                    <span className="cart-btn-checkout__amount">{formatCurrency(grandTotal + totalDeposit)}</span>
+                    <span className="cart-btn-checkout__amount">
+                      {formatCurrency(totalWhenOwnersConfirm)}
+                    </span>
                   )}
                 </button>
 
@@ -510,24 +675,10 @@ export default function CartPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Quick Help */}
-              <div className="cart-help-card">
-                <Icon name="help" filled />
-                <div>
-                  <h4>Bạn cần hỗ trợ?</h4>
-                  <p>Liên hệ đội ngũ LensLease để được tư vấn thuê thiết bị phù hợp.</p>
-                </div>
-                <button className="cart-help-card__btn">
-                  <Icon name="chat" />
-                  Chat ngay
-                </button>
-              </div>
             </aside>
           </div>
         </div>
     </div>
   );
 }
-
 

@@ -13,8 +13,6 @@ export default function ProductSpecs({ brand, specs }: ProductSpecsProps) {
           <span className="text-gray-500">Thương hiệu</span>
           <span className="font-semibold text-gray-900">{brand || 'Chưa cập nhật'}</span>
         </div>
-        
-        {/* Ví dụ render các thông số tĩnh mô phỏng giao diện của bạn */}
         <div className="flex flex-col gap-1.5">
           <span className="text-gray-500">Độ phân giải</span>
           <span className="font-semibold text-gray-900">61.0 Megapixels</span>

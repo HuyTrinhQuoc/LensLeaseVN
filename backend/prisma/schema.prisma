@@ -2,7 +2,6 @@
 generator client {
   provider = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
-  
 }
 
 datasource db {
@@ -11,7 +10,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
   extensions = [uuidOssp(map: "uuid-ossp")]
 }
-
 
 enum PromotionSponsor {
   PLATFORM    // Sàn tài trợ (Sàn chịu phí)
@@ -33,8 +31,6 @@ enum NotificationType {
  PROMOTION   // Thông báo khuyến mãi
             
 }
-
-
 
 enum Role {
   USER       // Người thuê 
@@ -66,9 +62,6 @@ enum ApprovalStatus {
   APPROVED   // Đã được duyệt
   REJECTED   // Bị từ chối
 }
-
-
-
 
 
 
@@ -111,6 +104,32 @@ enum TransactionStatus {
   SUCCESS       // Thanh toán thành công
   FAILED        // Thanh toán thất bại
   CANCELLED     // Giao dịch bị hủy
+}
+
+/// Bucket ví bị ảnh hưởng bởi dòng sổ cái (khớp available_balance / pending_balance).
+enum WalletBalanceBucket {
+  AVAILABLE
+  PENDING
+}
+
+enum WalletLedgerDirection {
+  CREDIT // Tăng số dư bucket
+  DEBIT  // Giảm số dư bucket
+}
+
+/// Phân bổ doanh thu owner theo từng Booking.
+enum BookingPayoutAllocationStatus {
+  PENDING    // Đã ghi nhận số tiền, chờ mốc nghiệp vụ (vd. đang thuê)
+  AVAILABLE  // Được tính vào số dư rút được / sổ AVAILABLE
+  PAID       // Đã chi qua Payout (hoặc đánh dấu đã trả)
+}
+
+/// Lệnh rút tiền owner về ngân hàng.
+enum PayoutRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
 }
 
 enum PaymentMethod {
@@ -166,6 +185,15 @@ model User {
   provider_id     String?        				// ID OAuth từ Google/Facebook
   bank_detail     BankDetail?
   rating_avg              Float?                                                                  // Điểm đánh giá trung bình
+  
+  // Các trường mới thêm cho User Profile & Lender
+  avatar_url      String?
+  bio             String?        @db.Text
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt @default(now())
+  cccd_front      String?
+  cccd_back       String?
+  kyc_status      ApprovalStatus?
 
   disputes_reported Dispute[] 					// Các dispute user đã báo cáo
   lens_listings     LensListing[] 				// Thiết bị user đăng cho thuê
@@ -183,6 +211,10 @@ model User {
 
   conversations_as_renter Conversation[] @relation("RenterConv") // Chat với vai trò người thuê
   conversations_as_owner  Conversation[] @relation("OwnerConv") // Chat với vai trò chủ máy
+
+  booking_payout_allocations BookingPayoutAllocation[]
+  payouts_as_owner           Payout[]                  @relation("OwnerPayouts")
+  payouts_processed_as_admin Payout[]                  @relation("AdminProcessedPayouts")
 
   @@map("users") 
 }
@@ -256,18 +288,19 @@ model LensListing {
   district                String?                                                                 // Quận/Huyện
   ward                    String?                                                                 // Phường/Xã
 
-  price_per_day           Decimal              @db.Decimal(12,2)                                       // Giá thuê mỗi ngày
-  thumbnail               String?                                                                 // Ảnh thumbnail đại diện
-  rating_avg              Float?                                                                  // Điểm đánh giá trung bình
-  review_count Int @default(0)
-  available               Boolean              @default(true)                                   // Có sẵn để thuê
-  is_deleted              Boolean              @default(false)                                  // Soft delete
-
-  allowed_deposit_types   DepositType[]        @default([MONEY_PLATFORM])                       // Các hình thức đặt cọc được hỗ trợ
-  required_deposit_amount Decimal?             @db.Decimal(12,2)                                       // Số tiền cọc yêu cầu
-
-
-  created_at              DateTime             @default(now()) @db.Timestamp(6)                 // Thời gian tạo bài đăng
+   price_per_day           Decimal              @db.Decimal(12,2)                                       // Giá thuê mỗi ngày
+   thumbnail               String?                                                                 // Ảnh thumbnail đại diện
+   rating_avg              Float?                                                                  // Điểm đánh giá trung bình
+   review_count Int @default(0)
+   available               Boolean              @default(true)                                   // Có sẵn để thuê
+   is_deleted              Boolean              @default(false)                                  // Soft delete
+ 
+   market_value            Decimal?             @db.Decimal(12,2)                                       // Giá trị thực tế của thiết bị (để tính cọc 50%)
+   allowed_deposit_types   DepositType[]        @default([MONEY_PLATFORM])                       // Chỉ cho phép cọc qua sàn để an toàn 100%
+   required_deposit_amount Decimal?             @db.Decimal(12,2)                                       // Số tiền cọc yêu cầu (tự động tính 50% từ market_value)
+ 
+ 
+   created_at              DateTime             @default(now()) @db.Timestamp(6)                 // Thời gian tạo bài đăng
 
   owner                   User                 @relation(fields: [owner_id], references: [id]) // Chủ sở hữu thiết bị
   specs                   LensSpec?                                                              // Danh sách thông số kỹ thuật
@@ -343,7 +376,8 @@ model BookingGroup {
   user                   User              @relation(fields: [user_id], references: [id])
   promotion   Promotion?   @relation(fields: [promotion_id], references: [id])
   bookings               Booking[]
-  transactions Transaction[]  
+  transactions           Transaction[]
+  wallet_transactions    WalletTransaction[]
   @@index([gateway_transaction_id])  
   @@map("booking_groups")   
 }
@@ -379,6 +413,8 @@ model Booking {
   deposit_amount         Decimal? @db.Decimal(12,2)                             // Số tiền cọc
   deposit_note           String?  @db.Text                                // Ghi chú tài sản/giấy tờ đặt cọc
   items                  BookingItem[]                                    // Danh sách sản phẩm trong booking
+  wallet_transactions    WalletTransaction[]
+  booking_payout_allocation BookingPayoutAllocation?
   @@index([start_date, end_date])
   @@index([status])
 @@index([user_id])
@@ -440,6 +476,7 @@ model Transaction {
   booking                Booking?   @relation(fields: [booking_id], references: [id]) // Quan hệ với Booking
   booking_group    BookingGroup?  @relation(fields: [booking_group_id], references: [id])
   user                   User      @relation(fields: [user_id], references: [id]) // Quan hệ với User
+  wallet_ledger_lines    WalletTransaction[]
   @@map("transactions")                                                       // Ánh xạ model tới bảng transactions
   @@index([user_id])
 @@index([booking_id])
@@ -524,7 +561,94 @@ model Wallet {
 
   user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  wallet_transactions WalletTransaction[]
+  payouts             Payout[]
+
   @@map("wallets")
+}
+
+/// Sổ cái biến động ví — mỗi lần đổi available/pending đều có dòng (append-only, audit).
+model WalletTransaction {
+  id                       String                 @id @default(uuid()) @db.Uuid
+  wallet_id                String                 @db.Uuid
+  booking_id               String?                @db.Uuid
+  booking_group_id         String?                @db.Uuid
+  reference_transaction_id String?                @db.Uuid // Giao dịch cổng (VNPay/MoMo) liên quan
+  payout_id                String?                @db.Uuid
+
+  bucket    WalletBalanceBucket
+  direction WalletLedgerDirection
+  amount    Decimal               @db.Decimal(12, 2) // Luôn dương; CREDIT/DEBIT + bucket quy định nghĩa
+
+  available_before Decimal @db.Decimal(12, 2)
+  available_after  Decimal @db.Decimal(12, 2)
+  pending_before   Decimal @db.Decimal(12, 2)
+  pending_after    Decimal @db.Decimal(12, 2)
+
+  note             String?  @db.Text
+  idempotency_key  String?  @unique @db.VarChar(255)
+  created_at       DateTime @default(now()) @db.Timestamp(6)
+
+  wallet                Wallet         @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+  booking               Booking?       @relation(fields: [booking_id], references: [id], onDelete: SetNull)
+  booking_group         BookingGroup?  @relation(fields: [booking_group_id], references: [id], onDelete: SetNull)
+  reference_transaction Transaction?   @relation(fields: [reference_transaction_id], references: [id], onDelete: SetNull)
+  payout                Payout?        @relation(fields: [payout_id], references: [id], onDelete: SetNull)
+
+  @@index([wallet_id, created_at])
+  @@index([booking_id])
+  @@index([payout_id])
+  @@map("wallet_transactions")
+}
+
+/// Phân bổ tiền cho owner theo từng Booking (sau thanh toán group / tách đơn).
+model BookingPayoutAllocation {
+  id              String                        @id @default(uuid()) @db.Uuid
+  booking_id      String                        @unique @db.Uuid
+  owner_id        String                        @db.Uuid
+  gross_amount    Decimal                       @db.Decimal(12, 2)
+  platform_fee    Decimal                       @default(0) @db.Decimal(12, 2)
+  net_amount      Decimal                       @db.Decimal(12, 2)
+  status          BookingPayoutAllocationStatus @default(PENDING)
+  created_at      DateTime                      @default(now()) @db.Timestamp(6)
+  updated_at      DateTime                      @updatedAt @db.Timestamp(6)
+
+  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  owner   User    @relation(fields: [owner_id], references: [id], onDelete: Restrict)
+
+  @@index([owner_id, status])
+  @@map("booking_payout_allocations")
+}
+
+/// Yêu cầu rút tiền của owner (admin duyệt / chuyển khoản).
+model Payout {
+  id                 String              @id @default(uuid()) @db.Uuid
+  owner_id           String              @db.Uuid
+  wallet_id          String              @db.Uuid
+  amount             Decimal             @db.Decimal(12, 2)
+  status             PayoutRequestStatus @default(PENDING)
+
+  bank_name         String? @db.VarChar(255)
+  bank_account      String? @db.VarChar(100)
+  bank_owner_name   String? @db.VarChar(255)
+
+  admin_note         String?   @db.Text
+  rejection_reason   String?   @db.Text
+  processed_at       DateTime? @db.Timestamp(6)
+  processed_by_id    String?   @db.Uuid
+
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @updatedAt @db.Timestamp(6)
+
+  owner        User   @relation("OwnerPayouts", fields: [owner_id], references: [id], onDelete: Restrict)
+  wallet       Wallet @relation(fields: [wallet_id], references: [id], onDelete: Restrict)
+  processed_by User?  @relation("AdminProcessedPayouts", fields: [processed_by_id], references: [id], onDelete: SetNull)
+
+  wallet_transactions WalletTransaction[]
+
+  @@index([owner_id, status])
+  @@index([wallet_id, status])
+  @@map("payouts")
 }
 
 
@@ -542,8 +666,6 @@ model Conversation {
   @@unique([renter_id, owner_id])                                         // Đảm bảo chỉ có 1 cuộc trò chuyện giữa renter và owner
   @@map("conversations")                                                  // Ánh xạ model tới bảng conversations
 }
-
-
 
 
 model Message {
@@ -581,10 +703,6 @@ model SystemLog {
 
   @@map("system_logs")                                      // Ánh xạ model tới bảng system_logs
 }
-
-
-
-
 
 model Notification {
   id            String   @id @default(uuid()) @db.Uuid                    // ID duy nhất của thông báo

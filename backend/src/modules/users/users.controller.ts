@@ -1,4 +1,4 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Headers, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 
@@ -24,6 +24,42 @@ export class UsersController {
     const user = await this.usersService.createMockUser();
     return {
       message: 'Đã tạo Mock User thành công, Database ghi nhận Ok!',
+      data: user,
+    };
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Lấy thông tin User đang đăng nhập', description: 'Yêu cầu có header x-user-id' })
+  async getMyProfile(@Headers('x-user-id') userId: string) {
+    if (!userId) {
+      throw new HttpException('Missing x-user-id header', HttpStatus.UNAUTHORIZED);
+    }
+    const user = await this.usersService.findById(userId);
+    return {
+      message: 'Lấy profile thành công',
+      data: user,
+    };
+  }
+
+  @Patch('me')
+  @ApiOperation({ summary: 'Cập nhật thông tin User đang đăng nhập', description: 'Yêu cầu có header x-user-id' })
+  async updateMyProfile(@Headers('x-user-id') userId: string, @Body() body: any) {
+    if (!userId) {
+      throw new HttpException('Missing x-user-id header', HttpStatus.UNAUTHORIZED);
+    }
+    const updated = await this.usersService.updateProfile(userId, body);
+    return {
+      message: 'Cập nhật profile thành công',
+      data: updated,
+    };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Lấy thông tin User theo ID (Public Profile)' })
+  async getUserById(@Param('id') id: string) {
+    const user = await this.usersService.findById(id);
+    return {
+      message: 'Lấy thông tin user thành công',
       data: user,
     };
   }

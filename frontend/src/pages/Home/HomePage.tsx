@@ -1,42 +1,125 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ProductCard from "../../components/layout/ProductCard";
+import Pagination from "../../components/common/Pagination";
 import type { ProductItem } from "../../type/product.type";
 
-interface ApiResponse {
+interface PaginatedApiResponse {
   message?: string;
   data: ProductItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const ITEMS_PER_PAGE = 8;
+
+/**
+ * Hook tái sử dụng cho mỗi section phân trang trên trang chủ.
+ */
+function usePaginatedSection(baseUrl: string, limit = ITEMS_PER_PAGE) {
+  const [items, setItems] = useState<ProductItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const separator = baseUrl.includes("?") ? "&" : "?";
+      const url = `${baseUrl}${separator}page=${page}&limit=${limit}`;
+      const res = await fetch(url);
+      const data: PaginatedApiResponse = await res.json();
+
+      setItems(data.data || []);
+      setTotalPages(data.totalPages || 1);
+      setTotal(data.total || 0);
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [baseUrl, page, limit]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { items, page, setPage, totalPages, total, loading };
 }
 
 export default function HomePage() {
-  const [featured, setFeatured] = useState<ProductItem[]>([]);
-  const [wides, setWides] = useState<ProductItem[]>([]);
-  const [cheap, setCheap] = useState<ProductItem[]>([]);
+  const featured = usePaginatedSection("http://localhost:3000/lenses?sort=rating");
+  const wides = usePaginatedSection("http://localhost:3000/lenses?category=e21744ed-e8d6-405f-b494-bdbb218c6762");
+  const cheap = usePaginatedSection("http://localhost:3000/lenses?sort=price_asc");
 
-  useEffect(() => {
-    const fetchLensesData = async () => {
-      try {
-        const [featuredRes, wideRes, cheapRes] = await Promise.all([
-          fetch("http://localhost:3000/lenses?sort=rating"),
-          fetch("http://localhost:3000/lenses?category=e21744ed-e8d6-405f-b494-bdbb218c6762"),
-          fetch("http://localhost:3000/lenses?sort=price_asc")
-        ]);
+  /** Skeleton loading placeholder */
+  const renderSkeleton = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
+        <div key={i} className="animate-pulse bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="aspect-[4/3] bg-gray-200" />
+          <div className="p-5 space-y-3">
+            <div className="h-5 bg-gray-200 rounded w-3/4" />
+            <div className="h-4 bg-gray-100 rounded w-1/2" />
+            <div className="h-4 bg-gray-100 rounded w-1/3 mt-4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
-        const [featuredData, wideData, cheapData] = await Promise.all<ApiResponse>([
-          featuredRes.json(),
-          wideRes.json(),
-          cheapRes.json()
-        ]);
+  /** Render một section sản phẩm có phân trang */
+  const renderSection = (
+    title: string,
+    subtitle: string,
+    section: ReturnType<typeof usePaginatedSection>
+  ) => (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">{title}</h2>
+          <p className="text-gray-500 mt-2">
+            {subtitle}
+            {!section.loading && (
+              <span className="ml-2 text-sm text-blue-600 font-medium">
+                ({section.total} thiết bị)
+              </span>
+            )}
+          </p>
+        </div>
+        <button className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group">
+          Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
+        </button>
+      </div>
 
-        setFeatured(featuredData.data || []);
-        setWides(wideData.data || []);
-        setCheap(cheapData.data || []);
-      } catch (error) {
-        console.error("Lỗi khi tải dữ liệu trang chủ:", error);
-      }
-    };
+      {section.loading ? (
+        renderSkeleton()
+      ) : section.items.length === 0 ? (
+        <div className="py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
+          Chưa có thiết bị nào trong danh mục này.
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {section.items.map((item) => (
+              <ProductCard key={item.id} item={item} />
+            ))}
+          </div>
 
-    fetchLensesData();
-  }, []);
+          {/* Phân trang */}
+          <div className="pt-4">
+            <Pagination
+              currentPage={section.page}
+              totalPages={section.totalPages}
+              onPageChange={(p) => section.setPage(p)}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -85,61 +168,25 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
         
         {/* Danh sách 1: Nổi bật */}
-        <div className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Thiết bị Nổi bật</h2>
-              <p className="text-gray-500 mt-2">Những camera và lens được yêu thích nhất trên LensLeaseVN</p>
-            </div>
-            <button className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group">
-              Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featured.map((item) => (
-              <ProductCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
+        {renderSection(
+          "Thiết bị Nổi bật",
+          "Những camera và lens được yêu thích nhất trên LensLeaseVN",
+          featured
+        )}
 
         {/* Danh sách 2: Góc rộng */}
-        <div className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Thiết bị góc rộng</h2>
-              <p className="text-gray-500 mt-2">Khám phá không gian rộng lớn với ống kính Ultrawide</p>
-            </div>
-            <button className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group">
-              Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {wides.map((item) => (
-              <ProductCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
+        {renderSection(
+          "Thiết bị góc rộng",
+          "Khám phá không gian rộng lớn với ống kính Ultrawide",
+          wides
+        )}
 
         {/* Danh sách 3: Giá rẻ */}
-        <div className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Thiết bị giá rẻ</h2>
-              <p className="text-gray-500 mt-2">Tiết kiệm chi phí tối đa cho dự án của bạn</p>
-            </div>
-            <button className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group">
-              Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {cheap.map((item) => (
-              <ProductCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
+        {renderSection(
+          "Thiết bị giá rẻ",
+          "Tiết kiệm chi phí tối đa cho dự án của bạn",
+          cheap
+        )}
 
       </section>
 
