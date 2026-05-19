@@ -1,4 +1,4 @@
-import "../styles/new-listing.css";
+import "../../styles/new-listing.css";
 
 interface NavItem {
   icon: string;

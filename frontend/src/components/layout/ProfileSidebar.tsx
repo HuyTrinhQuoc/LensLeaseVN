@@ -83,7 +83,7 @@ export default function ProfileSidebar() {
 
       {/* Bottom */}
       <div className="pdb-sidebar__bottom">
-        <Link to="/dashboard/new-listing" className="pdb-sidebar__cta">
+        <Link to="/new-listing" className="pdb-sidebar__cta">
           <span className="material-symbols-outlined">add</span>
           Đăng tin cho thuê
         </Link>
