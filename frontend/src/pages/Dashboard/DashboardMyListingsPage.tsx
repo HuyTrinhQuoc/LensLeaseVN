@@ -51,26 +51,6 @@ export default function DashboardMyListingsPage() {
             Quản lý các thiết bị bạn đã đăng cho thuê trên nền tảng.
           </p>
         </div>
-        
-        <Link
-          to="/dashboard/new-listing"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '10px 20px',
-            borderRadius: 8,
-            background: '#1a3fc7',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 700,
-            textDecoration: 'none',
-            boxShadow: '0 4px 12px rgba(26,63,199,0.25)',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
-          Đăng thiết bị mới
-        </Link>
       </div>
 
       {loading ? (

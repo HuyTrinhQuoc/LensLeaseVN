@@ -66,24 +66,30 @@ export default function ProfileSidebar() {
       {/* ── LENDER SECTION ── */}
       <div className="pdb-sidebar__section-label">Khi tôi cho thuê</div>
       <nav className="pdb-sidebar__nav">
-        {LENDER_MENU.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `pdb-sidebar__link ${isActive ? 'active' : ''}`
-            }
-          >
-            <span className="material-symbols-outlined">{item.icon}</span>
-            {item.label}
-          </NavLink>
-        ))}
+        {LENDER_MENU.map((item) => {
+          const isCustomActive = 
+            item.to === '/dashboard/my-listings' && 
+            location.pathname === '/dashboard/new-listing';
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `pdb-sidebar__link ${isActive || isCustomActive ? 'active' : ''}`
+              }
+            >
+              <span className="material-symbols-outlined">{item.icon}</span>
+              {item.label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bottom */}
       <div className="pdb-sidebar__bottom">
-        <Link to="/new-listing" className="pdb-sidebar__cta">
+        <Link to="/dashboard/new-listing" className="pdb-sidebar__cta">
           <span className="material-symbols-outlined">add</span>
           Đăng tin cho thuê
         </Link>

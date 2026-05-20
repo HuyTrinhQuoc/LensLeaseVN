@@ -1,333 +1,480 @@
-import "../../styles/new-listing.css";
-
-interface NavItem {
-  icon: string;
-  label: string;
-}
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
+import { getUserIdFromToken } from "../../utils/auth";
 
 interface ConditionItem {
+  id: string;
   label: string;
-  checked?: boolean;
+  checked: boolean;
 }
 
-interface PreviewImage {
-  src?: string;
-  alt: string;
-  isAddMore?: boolean;
-}
+export default function NewListingPage() {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null); // Khai báo Ref để kích hoạt sự kiện chọn file từ máy tính
 
-const navItems: NavItem[] = [
-  { icon: "dashboard", label: "Tổng quan" },
-  { icon: "camera", label: "Thiết bị của tôi" },
-  { icon: "pending_actions", label: "Yêu cầu thuê" },
-  { icon: "calendar_today", label: "Lịch trình" },
-  { icon: "payments", label: "Doanh thu" },
-  { icon: "settings", label: "Cài đặt" },
-];
+  // 1. Quản lý State cho các trường thông tin Form (Đã sẵn sàng)
+  const [title, setTitle] = useState("");
+  const [brand, setBrand] = useState("Sony");
+  const [productionYear, setProductionYear] = useState<number>(2024);
+  const [description, setDescription] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [pricePerDay, setPricePerDay] = useState("");
+  const [depositValue, setDepositValue] = useState(""); // Giá đền bù hư hỏng
+  const [insurancePackage, setInsurancePackage] = useState("Cơ bản (Đề xuất)");
+  const [loading, setLoading] = useState(false);
 
-const conditionItems: ConditionItem[] = [
-  { label: "Cảm biến sạch", checked: true },
-  { label: "Thân máy không trầy xước", checked: true },
-  { label: "Ống kính không mốc/rễ tre", checked: true },
-  { label: "Màn hình không điểm chết", checked: false },
-];
+  // State quản lý danh sách file thực tế để gửi lên BE và mảng link ảnh ảo để hiển thị lên UI
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
 
-const previewImages: PreviewImage[] = [
-  {
-    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuCzK9igNrPdPcG2H8uY96-IIsrL9AnauSNvHXUC_lTX5CTBs0XN-I9m4MBgQgmSTQqn1psZHQju_rnMDlnWH_FB6qnPvkYOSjaw9JIrB6XDq3V8oNlgu3hmVlepFBq5kKY4pcZOy1izPDhmBxg16IGh_0P8pBuK2uNPrwMUq4LLczrxodfKo_X_VQI6cdzke3lGRspgBl0_vk2xUKrou1DcPf0WHtphiwGu54h0-1PIoc2-TbsmFwHqTBvnDedZEAldaRddlGOdsus",
-    alt: "Camera Product",
-  },
-  {
-    src: "https://lh3.googleusercontent.com/aida-public/AB6AXuAUZDT87Wm6qHBct9JJqX5nx6ycLssch8xQOfSYMqPVZQqLoRNsx2zsoyjQV3nLQld7qAb5OH5A41rSddscxrZzKNzY7zkJ5-0LY4No6BrP37XHKDGP6yUywdti9a7xNy38MjXqToi6hvTkpIiQuCOGHi5VmHKmCV8LeR18AFLoiOaWAhC4aTeoc2muvIcxEAVuV0I6hroUZBkuI_9Ev03hVhOrWZXtbhZeKhhhjt7eS3mA2iRlfr7digJosHpsvLMiD7ECiC-YPN4",
-    alt: "Camera Lens",
-  },
-  {
-    alt: "Add more",
-    isAddMore: true,
-  },
-];
+  // State quản lý mảng tình trạng linh kiện (checkbox)
+  const [conditions, setConditions] = useState<ConditionItem[]>([
+    { id: "sensor", label: "Cảm biến sạch", checked: true },
+    { id: "body", label: "Thân máy không trầy xước", checked: true },
+    { id: "lens", label: "Ống kính không mốc/rễ tre", checked: true },
+    { id: "screen", label: "Màn hình không điểm chết", checked: false },
+  ]);
 
-const photoTips = [
-  "Chụp trong điều kiện đủ sáng tự nhiên.",
-  "Thể hiện rõ các cổng kết nối và sensor.",
-  "Đặt máy trên nền đơn sắc để nổi bật sản phẩm.",
-];
+  // Thay đổi trạng thái checkbox linh kiện
+  const handleToggleCondition = (id: string) => {
+    setConditions((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, checked: !item.checked } : item,
+      ),
+    );
+  };
 
-function Icon({ name }: { name: string }) {
-  return <span className="material-symbols-outlined">{name}</span>;
-}
+  // Logic xử lý khi người dùng nhấn chọn file ảnh
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
 
-function NewListingPage() {
+      // 1. Lưu file gốc vào state để sau này đẩy vào FormData gửi lên BE
+      setSelectedFiles((prev) => [...prev, ...filesArray]);
+
+      // 2. Tạo URL ảo (Blob) tạm thời để hiển thị hình ảnh preview lập tức lên màn hình
+      const newPreviews = filesArray.map((file) => URL.createObjectURL(file));
+      setPreviewImages((prev) => [...prev, ...newPreviews]);
+    }
+  };
+
+  // Logic xóa ảnh khi người dùng nhấn nút close (X) trên góc ảnh preview
+  const handleRemoveImage = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviewImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Tính toán tiến độ hoàn tất form dựa vào các trường bắt buộc + có ảnh hay chưa
+  const calculateProgress = () => {
+    let score = 0;
+    if (title.trim()) score += 20;
+    if (description.trim()) score += 20;
+    if (pricePerDay.trim()) score += 20;
+    if (depositValue.trim()) score += 20;
+    if (previewImages.length > 0) score += 20; // Thêm 20% tiến độ nếu có ảnh tải lên
+    return score;
+  };
+
+  // Hàm định dạng hiển thị số có dấu chấm hàng nghìn khi gõ (Visual only)
+  const formatNumberString = (value: string) => {
+    const cleanValue = value.replace(/\D/g, "");
+    if (!cleanValue) return "";
+    return new Intl.NumberFormat("vi-VN").format(parseInt(cleanValue));
+  };
+
+  // 2. Logic xử lý submit đăng tin lên Backend
+  const handleSubmitListing = async () => {
+    if (!title.trim() || !pricePerDay || !depositValue) {
+      alert(
+        "Vui lòng điền đầy đủ các thông tin bắt buộc (Tên máy, Giá thuê, Giá đền bù)!",
+      );
+      return;
+    }
+
+    const userId = getUserIdFromToken();
+    if (!userId) {
+      alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
+      return;
+    }
+
+    const rawPrice = parseInt(pricePerDay.replace(/\D/g, ""), 10);
+    const rawDeposit = parseInt(depositValue.replace(/\D/g, ""), 10);
+
+    try {
+      setLoading(true);
+
+      // Gói Payload JSON chuẩn bị truyền xuống API
+      const payload = {
+        title: title.trim(),
+        brand: brand,
+        description: `${description.trim()} [Năm SX: ${productionYear}] [S/N: ${serialNumber}] [Bảo hiểm: ${insurancePackage}]`,
+        price_per_day: rawPrice,
+        required_deposit_amount: rawDeposit,
+        city: "TP. Hồ Chí Minh",
+        district: "Quận 1",
+        thumbnail:
+          "https://images.unsplash.com/photo-1616712134411-6b6ae89bc3ba?q=80&w=600&auto=format&fit=crop", // Ảnh mẫu (Sẽ cập nhật khi xử lý upload ở BE)
+        owner_id: userId,
+      };
+
+      const response = await api.post("/lenses", payload);
+      if (response.status === 201 || response.data) {
+        alert(
+          "🎉 Đăng tin cho thuê thiết bị thành công! Đang chờ quản trị viên duyệt.",
+        );
+        navigate("/dashboard/my-listings");
+      }
+    } catch (error) {
+      console.error("Lỗi khi gọi API đăng tin:", error);
+      alert(
+        "Đã xảy ra lỗi hệ thống khi đăng tin. Vui lòng kiểm tra lại dữ liệu đầu vào!",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="dashboard-page new-listing-page">
-      <aside className="listing-sidebar">
-        <div className="listing-sidebar__brand">
-          <h1>Aperture Exchange</h1>
-          <p>Người cho thuê chuyên nghiệp</p>
-        </div>
-
-        <nav className="listing-sidebar__nav">
-          {navItems.map((item) => (
-            <a key={item.label} href="#" className="listing-sidebar__nav-item">
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
-
-        <div className="listing-sidebar__bottom">
-          <div className="listing-sidebar__promo">
-            <p>Sẵn sàng để mở rộng kho thiết bị?</p>
-            <button className="dashboard-btn-primary listing-sidebar__promo-btn">
-              Thêm thiết bị mới
-            </button>
-          </div>
-
-          <div className="listing-sidebar__profile">
-            <div className="listing-sidebar__avatar">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2NnwP8sV0njFrYpcqJKV7Z-dGL2za29U3jOw209F5C1UzCm0WaPKO1SuUZAjC_eOz3ppfEkLrJwMikh9eJFVxWg-vxQmdFH9kIphVXScOMwt9-wVL0yjObRePvR9_Z8gxH3DWjHxpedU_o1fiUWsb3c3Qbz_PCwzRRCMOpZA2ZQQ_BJ97XOrg6l_RgDGIyTfsx5_WOGTMLFT_R7vuxcreRXmPQaLSKrxonlGEM6VOyi2F4IDzyHO_UkF7dvCO9W2hKEMI7wEzN1U"
-                alt="Lender Profile"
-              />
-            </div>
-
-            <div className="listing-sidebar__profile-info">
-              <p className="listing-sidebar__profile-name">Minh Quân</p>
-              <p className="listing-sidebar__profile-role">Pro Vendor</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <main className="listing-main">
-        <header className="listing-topbar">
-          <div className="listing-topbar__search">
-            <Icon name="search" />
-            <input type="text" placeholder="Tìm kiếm trong kho của bạn..." />
-          </div>
-
-          <div className="listing-topbar__actions">
-            <button className="listing-topbar__icon-btn" aria-label="Thông báo">
-              <Icon name="notifications" />
-              <span className="listing-topbar__dot" />
-            </button>
-
-            <button className="listing-topbar__icon-btn" aria-label="Trợ giúp">
-              <Icon name="help_outline" />
-            </button>
-          </div>
+    <div className="w-full min-h-screen bg-[#f2f3fe] text-[#191b23] font-sans pb-32">
+      <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">
+        <header className="mb-10">
+          <nav className="flex gap-2 text-xs text-[#424654] mb-3">
+            <span
+              className="cursor-pointer hover:text-[#0040a1]"
+              onClick={() => navigate("/dashboard/my-listings")}
+            >
+              Thiết bị của tôi
+            </span>
+            <span>/</span>
+            <span className="text-[#0040a1] font-medium">Đăng tin mới</span>
+          </nav>
+          <h2 className="text-3xl md:text-4xl font-extrabold font-headline tracking-tight text-[#191b23]">
+            Đăng thiết bị mới lên LensLease
+          </h2>
+          <p className="text-[#424654] mt-2 max-w-2xl text-sm leading-relaxed">
+            Cung cấp chi tiết chính xác để tăng cơ hội tiếp cận khách hàng tiềm
+            năng và đảm bảo an toàn cho thiết bị of bạn.
+          </p>
         </header>
 
-        <div className="listing-content">
-          <header className="listing-page-header">
-            <nav className="listing-breadcrumb">
-              <span>Thiết bị của tôi</span>
-              <span>/</span>
-              <span className="is-active">Đăng tin mới</span>
-            </nav>
-
-            <h2>Đăng thiết bị mới lên LensLease</h2>
-            <p>
-              Cung cấp chi tiết chính xác để tăng cơ hội tiếp cận khách hàng
-              tiềm năng và đảm bảo an toàn cho thiết bị của bạn.
-            </p>
-          </header>
-
-          <div className="listing-layout">
-            <div className="listing-form-sections">
-              <section className="dashboard-card listing-section">
-                <div className="listing-section__title">
-                  <h3>Thông tin cơ bản</h3>
+        <div className="grid grid-cols-12 gap-6 md:gap-10">
+          <div className="col-span-12 lg:col-span-8 space-y-8 md:space-y-12">
+            {/* Khối 1: Thông tin cơ bản */}
+            <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-[#e7e7f2]">
+              <div className="flex items-center gap-3 mb-6 md:mb-8 border-l-4 border-[#0040a1] pl-4">
+                <h3 className="text-lg md:text-xl font-bold font-headline">
+                  Thông tin cơ bản
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Tên máy / Thiết bị <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-b-2 focus:border-[#0040a1] focus:bg-[#e1e2ec]/20 transition-all text-sm"
+                    placeholder="Ví dụ: Sony Alpha A7 IV hoặc Ống kính Sony FE 24-70mm f/2.8 GM II"
+                    type="text"
+                  />
                 </div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Hãng
+                  </label>
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="Ví dụ: Sony, Canon, Fujifilm..."
+                    className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-b-2 focus:border-[#0040a1] focus:bg-[#e1e2ec]/20 transition-all text-sm"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Năm sản xuất
+                  </label>
+                  <input
+                    value={productionYear}
+                    onChange={(e) => setProductionYear(Number(e.target.value))}
+                    className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-[#0040a1] transition-all text-sm"
+                    placeholder="2024"
+                    type="number"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Mô tả chi tiết
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-[#0040a1] transition-all text-sm resize-none"
+                    placeholder="Chia sẻ sâu về tình trạng ống kính/thân máy, số lượng pin đi kèm, hoặc các phụ kiện, filter hỗ trợ kèm theo khi thuê..."
+                    rows={4}
+                  ></textarea>
+                </div>
+              </div>
+            </section>
 
-                <div className="listing-form-grid">
-                  <div className="listing-form-field full">
-                    <label>Tên máy</label>
+            {/* Khối 2: Chi tiết kỹ thuật & Bảo mật */}
+            <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-[#e7e7f2]">
+              <div className="flex items-center gap-3 mb-6 md:mb-8 border-l-4 border-[#0040a1] pl-4">
+                <h3 className="text-lg md:text-xl font-bold font-headline">
+                  Chi tiết kỹ thuật & Bảo mật
+                </h3>
+              </div>
+              <div className="space-y-6 md:space-y-8">
+                <div>
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-1">
+                    Số seri (S/N)
+                  </label>
+                  <p className="text-[11px] text-[#424654] mb-3 italic">
+                    Thông tin này sẽ được hệ thống bảo mật và chỉ dùng để đối
+                    soát khi có sự cố phát sinh.
+                  </p>
+                  <input
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                    className="w-full max-w-sm bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-[#0040a1] transition-all text-sm"
+                    placeholder="S/N: 29384XXX"
+                    type="text"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-4">
+                    Tình trạng linh kiện hiện tại
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {conditions.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-3 p-4 border border-[#c3c6d6]/40 rounded-lg cursor-pointer hover:bg-[#f2f3fe] transition-colors select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={() => handleToggleCondition(item.id)}
+                          className="w-5 h-5 rounded border-[#c3c6d6] text-[#0040a1] focus:ring-[#0040a1]"
+                        />
+                        <span className="text-sm font-medium text-[#191b23]">
+                          {item.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Khối 3: Chính sách & Giá */}
+            <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-[#e7e7f2]">
+              <div className="flex items-center gap-3 mb-6 md:mb-8 border-l-4 border-[#0040a1] pl-4">
+                <h3 className="text-lg md:text-xl font-bold font-headline">
+                  Chính sách & Giá
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-6 md:gap-8">
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Giá thuê theo ngày <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
                     <input
+                      value={pricePerDay}
+                      onChange={(e) =>
+                        setPricePerDay(formatNumberString(e.target.value))
+                      }
+                      className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-[#0040a1] transition-all text-sm pr-12 font-semibold"
+                      placeholder="500.000"
                       type="text"
-                      placeholder="Ví dụ: Sony Alpha A7 IV"
                     />
-                  </div>
-
-                  <div className="listing-form-field">
-                    <label>Hãng</label>
-                    <select defaultValue="Sony">
-                      <option>Sony</option>
-                      <option>Canon</option>
-                      <option>Nikon</option>
-                      <option>Fujifilm</option>
-                      <option>Panasonic</option>
-                    </select>
-                  </div>
-
-                  <div className="listing-form-field">
-                    <label>Năm sản xuất</label>
-                    <input type="number" placeholder="2023" />
-                  </div>
-
-                  <div className="listing-form-field full">
-                    <label>Mô tả</label>
-                    <textarea
-                      rows={4}
-                      placeholder="Chia sẻ về tình trạng máy, số lượng pin đi kèm, hoặc các phụ kiện hỗ trợ..."
-                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#424654]">
+                      VNĐ
+                    </span>
                   </div>
                 </div>
-              </section>
-
-              <section className="dashboard-card listing-section">
-                <div className="listing-section__title">
-                  <h3>Chi tiết kỹ thuật &amp; Bảo mật</h3>
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-[#424654] uppercase tracking-wider mb-2">
+                    Gói bảo hiểm đề xuất
+                  </label>
+                  <select
+                    value={insurancePackage}
+                    onChange={(e) => setInsurancePackage(e.target.value)}
+                    className="w-full bg-[#e1e2ec]/40 p-4 rounded-t-lg border-b-2 border-transparent focus:outline-none focus:border-[#0040a1] transition-all text-sm"
+                  >
+                    <option value="Cơ bản (Đề xuất)">Cơ bản (Đề xuất)</option>
+                    <option value="Toàn diện (+15%)">Toàn diện (+15%)</option>
+                    <option value="Không bảo hiểm (Rủi ro cao)">
+                      Không bảo hiểm (Rủi ro cao)
+                    </option>
+                  </select>
                 </div>
 
-                <div className="listing-stack">
-                  <div className="listing-form-field">
-                    <label>Số seri (S/N)</label>
-                    <p className="listing-field-note">
-                      Thông tin này sẽ được bảo mật và chỉ dùng để đối soát khi
-                      có sự cố.
-                    </p>
+                <div className="col-span-2 p-5 md:p-6 rounded-xl bg-[#ffdad6]/40 border-2 border-dashed border-[#ba1a1a]/40">
+                  <label className="flex items-center gap-2 text-xs font-extrabold text-[#ba1a1a] uppercase tracking-wider mb-3">
+                    <span
+                      className="material-symbols-outlined text-base"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      warning
+                    </span>
+                    Giá đền bù nếu xảy ra hư hỏng / mất mát thiết bị{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-[#424654] mb-4">
+                    Mức phí đền bù này sẽ là căn cứ pháp lý cốt lõi để hệ thống
+                    xử lý khi có sự cố nghiêm trọng xảy ra với thiết bị trong
+                    quá trình cho thuê.
+                  </p>
+                  <div className="relative max-w-md">
                     <input
+                      value={depositValue}
+                      onChange={(e) =>
+                        setDepositValue(formatNumberString(e.target.value))
+                      }
+                      className="w-full bg-white p-4 rounded-t-lg border-b-2 border-[#ba1a1a]/60 font-bold text-[#ba1a1a] focus:outline-none focus:border-[#ba1a1a] transition-all text-sm pr-12 shadow-sm"
+                      placeholder="45.000.000"
                       type="text"
-                      placeholder="S/N: 29384XXX"
-                      className="listing-field-narrow"
                     />
-                  </div>
-
-                  <div>
-                    <label className="listing-group-label">
-                      Tình trạng linh kiện
-                    </label>
-
-                    <div className="listing-check-grid">
-                      {conditionItems.map((item) => (
-                        <label key={item.label} className="listing-check-item">
-                          <input
-                            type="checkbox"
-                            defaultChecked={item.checked}
-                          />
-                          <span>{item.label}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#ba1a1a]">
+                      VNĐ
+                    </span>
                   </div>
                 </div>
-              </section>
+              </div>
+            </section>
+          </div>
 
-              <section className="dashboard-card listing-section">
-                <div className="listing-section__title">
-                  <h3>Chính sách &amp; Giá</h3>
+          {/* Cột phải: Khối Upload hình ảnh chiếm 4 cột */}
+          <div className="col-span-12 lg:col-span-4">
+            <div className="sticky top-24 space-y-6">
+              <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-[#e7e7f2]">
+                <h3 className="text-base md:text-lg font-bold font-headline mb-5">
+                  Hình ảnh thiết bị
+                </h3>
+                <div className="space-y-4">
+                  {/* Thẻ input file ẩn được điều hướng bằng Ref để bắt sự kiện tải file của trình duyệt */}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {/* Khi nhấn vào khung kéo thả này, nó sẽ tự động kích hoạt click vào ô chọn file ẩn phía trên */}
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square w-full rounded-xl border-2 border-dashed border-[#c3c6d6] bg-[#f2f3fe]/50 flex flex-col items-center justify-center p-6 text-center group cursor-pointer hover:border-[#0040a1] transition-colors"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-[#0040a1]/10 flex items-center justify-center text-[#0040a1] mb-3 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined text-2xl">
+                        add_a_photo
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-[#191b23]">
+                      Kéo thả hoặc click để tải
+                    </p>
+                    <p className="text-[11px] text-[#424654] mt-1.5">
+                      Tối thiểu 5 ảnh thực tế rõ góc cạnh (PNG, JPG)
+                    </p>
+                  </div>
+
+                  {/* Lặp qua danh sách ảnh thực tế để hiển thị Preview động thay vì ảnh tĩnh (Hardcode) */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {previewImages.map((src, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-lg bg-[#ededf8] overflow-hidden group relative border border-[#e7e7f2]"
+                      >
+                        <img
+                          alt={`Product Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          src={src}
+                        />
+                        <button
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-[#ba1a1a] opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <span className="material-symbols-outlined text-xs font-bold">
+                            close
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Ô bấm thêm nhanh nếu đã có ảnh trước đó */}
+                    {previewImages.length > 0 && (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-lg border-2 border-dashed border-[#c3c6d6] flex items-center justify-center text-[#424654] bg-[#f2f3fe]/20 hover:bg-[#ededf8] cursor-pointer transition-colors"
+                      >
+                        <span className="material-symbols-outlined font-bold">
+                          add
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="listing-form-grid listing-form-grid--policy">
-                  <div className="listing-form-field">
-                    <label>Giá thuê theo ngày</label>
-                    <div className="listing-input-with-suffix">
-                      <input type="text" placeholder="500.000" />
-                      <span>VNĐ</span>
-                    </div>
-                  </div>
-
-                  <div className="listing-form-field">
-                    <label>Phí bảo hiểm thiết bị</label>
-                    <div className="listing-info-badge">
-                      <Icon name="verified_user" />
-                      <span>Tự động (1% giá trị máy)</span>
-                    </div>
-                    <p className="listing-field-note mt-1 text-[10px]">Phí này dùng để bồi thường 50% còn lại nếu có rủi ro.</p>
-                  </div>
-
-                  <div className="listing-warning-box full">
-                    <label className="listing-warning-box__label">
-                      <Icon name="monetization_on" />
-                      Giá trị thực tế của thiết bị (Market Value)
-                    </label>
-
-                    <p>
-                      Mức giá này dùng để tính tiền cọc (**50% giá trị**) và phí bảo hiểm. 
-                      Vui lòng nhập giá trị thị trường chính xác của máy cũ.
-                    </p>
-
-                    <div className="listing-input-with-suffix listing-input-with-suffix--success">
-                      <input type="text" placeholder="Ví dụ: 30.000.000" />
-                      <span>VNĐ</span>
-                    </div>
-                    <p className="mt-2 text-[11px] text-emerald-700 font-medium">
-                      * Hệ thống sẽ tự động yêu cầu khách thuê ký quỹ 50% số tiền này qua sàn.
-                    </p>
-                  </div>
+                <div className="mt-6 p-4 rounded-lg bg-[#f2f3fe]">
+                  <h4 className="text-xs font-bold text-[#191b23] uppercase tracking-wide mb-3">
+                    Mẹo đăng ảnh hút khách
+                  </h4>
+                  <ul className="text-[11px] space-y-2 text-[#424654] leading-relaxed">
+                    <li className="flex gap-2">
+                      <span className="text-[#0040a1] font-bold">01.</span> Chụp
+                      thiết bị trong không gian đủ sáng tự nhiên.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-[#0040a1] font-bold">02.</span> Thể
+                      hiện rõ tình trạng ngàm, thấu kính trước sau và sensor.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-[#0040a1] font-bold">03.</span> Đặt
+                      máy trên nền đơn sắc trung tính để làm nổi bật sản phẩm.
+                    </li>
+                  </ul>
                 </div>
               </section>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <aside className="listing-media-column">
-              <div className="listing-media-sticky">
-                <section className="dashboard-card listing-media-panel">
-                  <h3>Hình ảnh thiết bị</h3>
-
-                  <div className="listing-upload-zone">
-                    <div className="listing-upload-zone__icon">
-                      <Icon name="add_a_photo" />
-                    </div>
-                    <p>Kéo thả hoặc click để tải</p>
-                    <span>Tối thiểu 5 ảnh chất lượng cao (PNG, JPG)</span>
-                  </div>
-
-                  <div className="listing-preview-grid">
-                    {previewImages.map((item, index) =>
-                      item.isAddMore ? (
-                        <div key={index} className="listing-preview-add">
-                          <Icon name="add" />
-                        </div>
-                      ) : (
-                        <div key={index} className="listing-preview-item">
-                          <img src={item.src} alt={item.alt} />
-                          <button
-                            className="listing-preview-remove"
-                            aria-label="Xóa ảnh"
-                          >
-                            <Icon name="close" />
-                          </button>
-                        </div>
-                      )
-                    )}
-                  </div>
-
-                  <div className="listing-photo-tips">
-                    <h4>Mẹo chụp ảnh đẹp</h4>
-                    <ul>
-                      {photoTips.map((tip, index) => (
-                        <li key={tip}>
-                          <span>{String(index + 1).padStart(2, "0")}.</span>
-                          <p>{tip}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </section>
-              </div>
-            </aside>
+      <footer className="fixed bottom-0 right-0 w-full lg:w-[calc(100%-16rem)] bg-white/90 backdrop-blur-md px-6 md:px-12 py-5 flex justify-end gap-6 items-center shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)] z-40 border-t border-[#e7e7f2]">
+        <div className="mr-auto hidden sm:block">
+          <span className="text-xs font-bold text-[#424654] uppercase tracking-widest">
+            Tiến độ hoàn tất form
+          </span>
+          <div className="w-48 h-1.5 bg-[#ededf8] rounded-full mt-1.5 overflow-hidden">
+            <div
+              className="h-full bg-[#0040a1] transition-all duration-700"
+              style={{ width: `${calculateProgress()}%` }}
+            ></div>
           </div>
         </div>
 
-        <footer className="listing-footer">
-          <div className="listing-footer__progress">
-            <span>Tiến độ hoàn tất</span>
-            <div className="listing-footer__progress-bar">
-              <div className="listing-footer__progress-value" />
-            </div>
-          </div>
+        <button
+          onClick={() => navigate("/dashboard/my-listings")}
+          disabled={loading}
+          className="px-6 md:px-8 py-3 text-sm font-bold text-[#424654] hover:text-[#191b23] transition-colors disabled:opacity-50"
+        >
+          Hủy
+        </button>
 
-          <div className="listing-footer__actions">
-            <button className="listing-cancel-btn">Hủy</button>
-            <button className="dashboard-btn-primary listing-submit-btn">
-              Đăng tin ngay
-            </button>
-          </div>
-        </footer>
-      </main>
+        <button
+          onClick={handleSubmitListing}
+          disabled={loading}
+          className="px-8 md:px-10 py-3 bg-[#0040a1] text-white text-sm font-bold rounded-lg shadow-xl shadow-[#0040a1]/20 hover:bg-[#0056d2] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+        >
+          {loading ? "Đang xử lý..." : "Đăng tin ngay"}
+        </button>
+      </footer>
     </div>
   );
 }
-
-export default NewListingPage;

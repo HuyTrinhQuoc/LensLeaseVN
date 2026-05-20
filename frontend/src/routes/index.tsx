@@ -81,11 +81,12 @@ export default function AppRoutes() {
         <Route path="wallet/topup/result" element={<WalletTopupResultPage />} />
         <Route path="my-listings" element={<DashboardMyListingsPage />} />
         <Route path="stats" element={<DashboardStatsPage />} />
+        <Route path="new-listing" element={<NewListingPage />} />
 
         {/* Reuse existing NewListingPage nếu có */}
         
       </Route>
-      <Route path="new-listing" element={<NewListingPage />} />
+      
 
       {/* ══════════════════════════════════════════════
           LEGACY LENDER ROUTES (redirect to new dashboard)
