@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { CreateCameraDto } from './dto/create-camera.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CamerasService {
@@ -26,109 +32,23 @@ export class CamerasService {
     const where: any = {
       is_deleted: false,
     };
-    
+
     if (owner_id) {
-      // Chủ máy xem thiết bị của mình, hiển thị cả chưa duyệt
       where.owner_id = owner_id;
     } else {
-      // Khách hàng xem: chỉ hiển thị thiết bị Đã Duyệt
       where.approval_status = 'APPROVED';
     }
 
-    // ======================
-    // CATEGORY
-    // ======================
     if (category) where.category_id = category;
-
-    // ======================
-    // LOCATION
-    // ======================
     if (city) where.city = city;
     if (district) where.district = district;
     if (ward) where.ward = ward;
 
-    // ======================
-    // BRAND
-    // ======================
-    if (brand) where.brand = brand;
-
-    // ======================
-    // AVAILABLE
-    // ======================
-    if (available !== undefined) {
-      where.available = available === 'true' || available === true;
-    }
-
-    // ======================
-    // PRICE FILTER (SAFE)
-    // ======================
-    if (minPrice || maxPrice) {
-      where.price_per_day = {
-        ...(minPrice ? { gte: Number(minPrice) } : {}),
-        ...(maxPrice ? { lte: Number(maxPrice) } : {}),
-      };
-    }
-
-    // ======================
-    // RATING FILTER
-    // ======================
-    if (minRating) {
-      where.rating_avg = {
-        gte: Number(minRating),
-      };
-    }
-
-    // ======================
-    // SEARCH SAFE
-    // ======================
-    const keyword = search?.trim();
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword, mode: 'insensitive' } },
-        { description: { contains: keyword, mode: 'insensitive' } },
-        { brand: { contains: keyword, mode: 'insensitive' } },
-        { city: { contains: keyword, mode: 'insensitive' } },
-        { district: { contains: keyword, mode: 'insensitive' } },
-      ];
-    }
-
-    // ======================
-    // SORT CLEAN
-    // ======================
-    let orderBy: any = { created_at: 'desc' };
-
-    switch (sort) {
-      case 'rating':
-        orderBy = { rating_avg: 'desc' };
-        break;
-
-      case 'price_asc':
-        orderBy = { price_per_day: 'asc' };
-        break;
-
-      case 'price_desc':
-        orderBy = { price_per_day: 'desc' };
-        break;
-
-      case 'newest':
-        orderBy = { created_at: 'desc' };
-        break;
-
-      case 'oldest':
-        orderBy = { created_at: 'asc' };
-        break;
-
-      case 'popular':
-        orderBy = { review_count: 'desc' };
-        break;
-    }
-
-    // ======================
-    // PAGINATION SAFE
-    // ======================
     const pageNum = Math.max(Number(page) || 1, 1);
     const limitNum = Math.max(Number(limit) || 10, 1);
     const skip = (pageNum - 1) * limitNum;
+
+    const orderBy: any = { created_at: 'desc' };
 
     const [products, total] = await Promise.all([
       this.prisma.lensListing.findMany({
@@ -149,7 +69,6 @@ export class CamerasService {
           },
         },
       }),
-
       this.prisma.lensListing.count({ where }),
     ]);
 
@@ -162,32 +81,59 @@ export class CamerasService {
     };
   }
 
-
-  
-async findById(id: string) {
-  const product = await this.prisma.lensListing.findUnique({
-    where: { id },
-    include: {
-      images: true, 
-      specs: true,  
-      category: true, 
-      owner: {
-        select: {
-          id: true,
-          full_name: true,
-          phone: true,
-          rating_avg: true,
+  async findById(id: string) {
+    const product = await this.prisma.lensListing.findUnique({
+      where: { id },
+      include: {
+        images: true,
+        specs: true,
+        category: true,
+        owner: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            rating_avg: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!product) {
-    throw new NotFoundException(`Không tìm thấy thiết bị với ID: ${id}`);
+    if (!product) {
+      throw new NotFoundException('Không tìm thấy sản phẩm này!');
+    }
+    return product;
   }
 
-  // SỬA Ở ĐÂY: Trả về trực tiếp object product thay vì bọc { data: product }
-  return product; 
-}
-  
+  // ==========================================
+  // LOGIC ĐĂNG TIN MỚI ĐƯỢC GỘP VÀO ĐÂY
+  // ==========================================
+  async createListing(createListingDto: any, userId: string) {
+    const { images, ...listingData } = createListingDto;
+
+    const dataToSave = {
+      title: listingData.name || 'Sản phẩm mới',
+      brand: listingData.brand || null,
+      description: listingData.description || null,
+      price_per_day: listingData.price_per_day || 0,
+      required_deposit_amount: listingData.deposit_value || 0,
+      category_id: listingData.category_id || null,
+      owner_id: userId,
+      available: true,
+      is_deleted: false,
+      approval_status: 'PENDING' as const,
+    };
+
+    const imageObjects =
+      images?.map((url: string) => ({ image_url: url })) || [];
+
+    return await this.prisma.lensListing.create({
+      data: {
+        ...dataToSave,
+        images: {
+          create: imageObjects,
+        },
+      },
+    });
+  }
 }

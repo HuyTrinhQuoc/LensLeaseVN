@@ -25,11 +25,13 @@ import BookingPaymentResultPage from '../pages/Checkout/BookingPaymentResultPage
 import BookingHistoryPage from '../pages/History/HistoryPage';
 import BookingDetailPage from '../pages/BookingDetail/BookingDetailPage';
 import ChatPage from '../pages/Chat/ChatPage';
+import NewListingPage from '../pages/Owner/NewListingPage';
 
 // Pages — Dashboard (Profile / Lender)
 import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
 import DashboardMyListingsPage from '../pages/Dashboard/DashboardMyListingsPage';
 import DashboardStatsPage from '../pages/Dashboard/DashboardStatsPage';
+import HandoverForm from '../components/layout/HandoverForm';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -79,10 +81,12 @@ export default function AppRoutes() {
         <Route path="wallet/topup/result" element={<WalletTopupResultPage />} />
         <Route path="my-listings" element={<DashboardMyListingsPage />} />
         <Route path="stats" element={<DashboardStatsPage />} />
+        <Route path="new-listing" element={<NewListingPage />} />
 
         {/* Reuse existing NewListingPage nếu có */}
-        {/* <Route path="new-listing" element={<NewListingPage />} /> */}
+        
       </Route>
+      
 
       {/* ══════════════════════════════════════════════
           LEGACY LENDER ROUTES (redirect to new dashboard)
