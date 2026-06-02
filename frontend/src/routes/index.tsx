@@ -32,6 +32,7 @@ import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
 import DashboardMyListingsPage from '../pages/Dashboard/DashboardMyListingsPage';
 import DashboardStatsPage from '../pages/Dashboard/DashboardStatsPage';
 import HandoverForm from '../components/layout/HandoverForm';
+import VerifyEmail from '../components/layout/VerifyEmail';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -100,6 +101,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login-success" element={<LoginSuccess />} />
+      <Route path="/verify" element={<VerifyEmail />} />
     </Routes>
   );
 }

@@ -1,19 +1,494 @@
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  extensions = [uuidOssp(map: "uuid-ossp")]
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp")]
+}
+
+model User {
+  id                         String                    @id @default(uuid()) @db.Uuid
+  email                      String                    @unique
+  password_hash              String?
+  full_name                  String?
+  phone                      String?
+  address                    String?
+  role                       Role                      @default(USER)
+  status                     AccountStatus             @default(ACTIVE)
+  is_deleted                 Boolean                   @default(false)
+  auth_provider              AuthProvider              @default(LOCAL)
+  provider_id                String?
+  rating_avg                 Float?
+  avatar_url                 String?
+  bio                        String?
+  cccd_back                  String?
+  cccd_front                 String?
+  created_at                 DateTime                  @default(now())
+  kyc_status                 ApprovalStatus?
+  updated_at                 DateTime                  @default(now()) @updatedAt
+  is_verified                Boolean?                  @default(false)
+  bank_detail                BankDetail?
+  booking_groups             BookingGroup[]
+  booking_payout_allocations BookingPayoutAllocation[]
+  owned_bookings             Booking[]                 @relation("OwnerRelation")
+  rented_bookings            Booking[]                 @relation("RenterRelation")
+  cart                       Cart?
+  conversations_as_owner     Conversation[]            @relation("OwnerConv")
+  conversations_as_renter    Conversation[]            @relation("RenterConv")
+  disputes_reported          Dispute[]
+  lens_listings              LensListing[]
+  sent_messages              Message[]                 @relation("MessageSender")
+  notifications              Notification[]
+  payouts_as_owner           Payout[]                  @relation("OwnerPayouts")
+  payouts_processed_as_admin Payout[]                  @relation("AdminProcessedPayouts")
+  created_promotions         Promotion[]               @relation("PromotionCreator")
+  reviews_received           Review[]                  @relation("ReviewedUser")
+  reviews_written            Review[]                  @relation("Reviewer")
+  transactions               Transaction[]
+  wallet                     Wallet?
+
+  @@map("users")
+}
+
+model BankDetail {
+  id           String  @id @default(uuid()) @db.Uuid
+  user_id      String  @unique @db.Uuid
+  bank_name    String?
+  bank_account String?
+  bank_owner   String?
+  user         User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("bank_details")
+}
+
+model Cart {
+  id      String     @id @default(uuid()) @db.Uuid
+  user_id String     @unique @db.Uuid
+  items   CartItem[]
+  user    User       @relation(fields: [user_id], references: [id])
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String      @id @default(uuid()) @db.Uuid
+  cart_id    String      @db.Uuid
+  lens_id    String      @db.Uuid
+  quantity   Int         @default(1)
+  start_date DateTime    @db.Date
+  end_date   DateTime    @db.Date
+  cart       Cart        @relation(fields: [cart_id], references: [id])
+  lens       LensListing @relation(fields: [lens_id], references: [id])
+
+  @@map("cart_items")
+}
+
+model Category {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @unique
+  description   String?
+  created_at    DateTime      @default(now()) @db.Timestamp(6)
+  lens_listings LensListing[]
+
+  @@map("categories")
+}
+
+model LensListing {
+  id                      String         @id @default(uuid()) @db.Uuid
+  owner_id                String         @db.Uuid
+  title                   String
+  description             String?
+  quantity                Int            @default(1)
+  brand                   String?
+  category_id             String?        @db.Uuid
+  approval_status         ApprovalStatus @default(PENDING)
+  city                    String?
+  district                String?
+  ward                    String?
+  price_per_day           Decimal        @db.Decimal(12, 2)
+  thumbnail               String?
+  rating_avg              Float?
+  review_count            Int            @default(0)
+  available               Boolean        @default(true)
+  is_deleted              Boolean        @default(false)
+  allowed_deposit_types   DepositType[]  @default([MONEY_PLATFORM])
+  required_deposit_amount Decimal?       @db.Decimal(12, 2)
+  created_at              DateTime       @default(now()) @db.Timestamp(6)
+  market_value            Decimal?       @db.Decimal(12, 2)
+  blocked_dates           BlockedDate[]
+  booking_items           BookingItem[]
+  cart_items              CartItem[]
+  images                  LensImage[]
+  category                Category?      @relation(fields: [category_id], references: [id])
+  owner                   User           @relation(fields: [owner_id], references: [id])
+  specs                   LensSpec?
+  reviews                 Review[]
+  promotions              Promotion[]    @relation("LensToPromotion")
+
+  @@index([owner_id])
+  @@index([category_id])
+  @@index([brand])
+  @@index([city, district])
+  @@index([approval_status, available, is_deleted])
+  @@map("lens_listings")
+}
+
+model LensSpec {
+  id                  String      @id @default(uuid()) @db.Uuid
+  lens_id             String      @unique @db.Uuid
+  focal_length        String?
+  max_aperture        String?
+  mount               String?
+  sensor_format       String?
+  image_stabilization Boolean?
+  lens                LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade)
+
+  @@map("lens_specs")
+}
+
+model LensImage {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lens_id   String      @db.Uuid
+  image_url String?
+  lens      LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade)
+
+  @@map("lens_images")
+}
+
+model BookingGroup {
+  id                     String              @id @default(uuid()) @db.Uuid
+  user_id                String              @db.Uuid
+  sub_total              Decimal             @db.Decimal(12, 2)
+  discount_amount        Decimal             @default(0) @db.Decimal(12, 2)
+  total_amount           Decimal             @db.Decimal(12, 2)
+  payment_method         PaymentMethod       @default(CASH)
+  status                 BookingGroupStatus  @default(PENDING)
+  gateway_transaction_id String?
+  promotion_id           String?             @db.Uuid
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
+  promotion              Promotion?          @relation(fields: [promotion_id], references: [id])
+  user                   User                @relation(fields: [user_id], references: [id])
+  bookings               Booking[]
+  transactions           Transaction[]
+  wallet_transactions    WalletTransaction[]
+
+  @@index([gateway_transaction_id])
+  @@map("booking_groups")
+}
+
+model Booking {
+  id                        String                   @id @default(uuid()) @db.Uuid
+  user_id                   String                   @db.Uuid
+  owner_id                  String                   @db.Uuid
+  promotion_id              String?                  @db.Uuid
+  booking_group_id          String?                  @db.Uuid
+  start_date                DateTime
+  end_date                  DateTime
+  sub_total                 Decimal                  @db.Decimal(12, 2)
+  discount_amount           Decimal                  @default(0) @db.Decimal(12, 2)
+  total_price               Decimal                  @db.Decimal(12, 2)
+  platform_fee_amount       Decimal                  @default(0) @db.Decimal(12, 2)
+  status                    BookingStatus            @default(PENDING)
+  delivery_method           DeliveryMethod           @default(SELF_PICKUP)
+  delivery_address          String?
+  is_extension_requested    Boolean                  @default(false)
+  requested_end_date        DateTime?
+  extension_status          ExtensionStatus?
+  created_at                DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at                DateTime                 @default(now()) @updatedAt
+  selected_deposit_type     DepositType
+  deposit_amount            Decimal?                 @db.Decimal(12, 2)
+  deposit_note              String?
+  items                     BookingItem[]
+  booking_payout_allocation BookingPayoutAllocation?
+  booking_group             BookingGroup?            @relation(fields: [booking_group_id], references: [id])
+  owner                     User                     @relation("OwnerRelation", fields: [owner_id], references: [id])
+  promotion                 Promotion?               @relation(fields: [promotion_id], references: [id])
+  user                      User                     @relation("RenterRelation", fields: [user_id], references: [id])
+  disputes                  Dispute[]
+  reviews                   Review[]
+  transactions              Transaction[]
+  wallet_transactions       WalletTransaction[]
+
+  @@index([start_date, end_date])
+  @@index([status])
+  @@index([user_id])
+  @@index([owner_id])
+  @@index([booking_group_id])
+  @@map("bookings")
+}
+
+model BookingItem {
+  id            String      @id @default(uuid()) @db.Uuid
+  booking_id    String      @db.Uuid
+  lens_id       String      @db.Uuid
+  quantity      Int         @default(1)
+  price_per_day Decimal     @db.Decimal(12, 2)
+  booking       Booking     @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  lens          LensListing @relation(fields: [lens_id], references: [id])
+
+  @@map("booking_items")
+}
+
+model Dispute {
+  id              String        @id @default(uuid()) @db.Uuid
+  booking_id      String        @db.Uuid
+  reporter_id     String        @db.Uuid
+  reason          String
+  evidence_images String[]
+  status          DisputeStatus @default(PENDING)
+  admin_note      String?
+  created_at      DateTime      @default(now()) @db.Timestamp(6)
+  updated_at      DateTime      @updatedAt
+  booking         Booking       @relation(fields: [booking_id], references: [id])
+  reporter        User          @relation(fields: [reporter_id], references: [id])
+
+  @@map("disputes")
+}
+
+model Transaction {
+  id                     String              @id @default(uuid()) @db.Uuid
+  booking_id             String?             @db.Uuid
+  booking_group_id       String?             @db.Uuid
+  user_id                String              @db.Uuid
+  amount                 Decimal             @db.Decimal(12, 2)
+  type                   TransactionType
+  status                 TransactionStatus   @default(PENDING)
+  payment_method         PaymentMethod
+  gateway_transaction_id String?
+  description            String?
+  created_at             DateTime            @default(now()) @db.Timestamp(6)
+  updated_at             DateTime            @updatedAt
+  booking_group          BookingGroup?       @relation(fields: [booking_group_id], references: [id])
+  booking                Booking?            @relation(fields: [booking_id], references: [id])
+  user                   User                @relation(fields: [user_id], references: [id])
+  wallet_ledger_lines    WalletTransaction[]
+
+  @@index([user_id])
+  @@index([booking_id])
+  @@index([booking_group_id])
+  @@index([gateway_transaction_id])
+  @@index([status])
+  @@map("transactions")
+}
+
+model Promotion {
+  id                  String           @id @default(uuid()) @db.Uuid
+  code                String           @unique
+  sponsor_type        PromotionSponsor @default(PLATFORM)
+  creator_id          String?          @db.Uuid
+  discount_type       PromotionType
+  discount_value      Decimal          @db.Decimal(12, 2)
+  min_order_value     Decimal?         @db.Decimal(12, 2)
+  max_discount_amount Decimal?         @db.Decimal(12, 2)
+  start_date          DateTime         @db.Timestamp(6)
+  end_date            DateTime         @db.Timestamp(6)
+  usage_limit         Int?
+  used_count          Int              @default(0)
+  is_active           Boolean          @default(true)
+  created_at          DateTime         @default(now()) @db.Timestamp(6)
+  updated_at          DateTime         @updatedAt
+  booking_groups      BookingGroup[]
+  bookings            Booking[]
+  creator             User?            @relation("PromotionCreator", fields: [creator_id], references: [id])
+  applicable_lenses   LensListing[]    @relation("LensToPromotion")
+
+  @@map("promotions")
+}
+
+model Review {
+  id               String       @id @default(uuid()) @db.Uuid
+  reviewer_id      String       @db.Uuid
+  booking_id       String       @db.Uuid
+  lens_id          String?      @db.Uuid
+  reviewed_user_id String?      @db.Uuid
+  rating           Int
+  comment          String?
+  owner_reply      String?
+  created_at       DateTime     @default(now()) @db.Timestamp(6)
+  booking          Booking      @relation(fields: [booking_id], references: [id])
+  lens             LensListing? @relation(fields: [lens_id], references: [id], onDelete: Cascade)
+  reviewed_user    User?        @relation("ReviewedUser", fields: [reviewed_user_id], references: [id])
+  reviewer         User         @relation("Reviewer", fields: [reviewer_id], references: [id])
+
+  @@unique([booking_id, lens_id])
+  @@unique([booking_id, reviewed_user_id])
+  @@map("reviews")
+}
+
+model BlockedDate {
+  id               String      @id @default(uuid()) @db.Uuid
+  lens_id          String      @db.Uuid
+  blocked_quantity Int         @default(1)
+  start_date       DateTime
+  end_date         DateTime
+  reason           String?
+  lens             LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade)
+
+  @@index([lens_id, start_date, end_date])
+  @@map("blocked_dates")
+}
+
+model Wallet {
+  id                  String              @id @default(uuid()) @db.Uuid
+  user_id             String              @unique @db.Uuid
+  available_balance   Decimal             @default(0) @db.Decimal(12, 2)
+  pending_balance     Decimal             @default(0) @db.Decimal(12, 2)
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime            @updatedAt
+  payouts             Payout[]
+  wallet_transactions WalletTransaction[]
+  user                User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+/// Sổ cái biến động ví — mỗi lần đổi available/pending đều có dòng (append-only, audit).
+model WalletTransaction {
+  id                       String                @id @default(uuid()) @db.Uuid
+  wallet_id                String                @db.Uuid
+  booking_id               String?               @db.Uuid
+  booking_group_id         String?               @db.Uuid
+  reference_transaction_id String?               @db.Uuid
+  payout_id                String?               @db.Uuid
+  bucket                   WalletBalanceBucket
+  direction                WalletLedgerDirection
+  amount                   Decimal               @db.Decimal(12, 2)
+  available_before         Decimal               @db.Decimal(12, 2)
+  available_after          Decimal               @db.Decimal(12, 2)
+  pending_before           Decimal               @db.Decimal(12, 2)
+  pending_after            Decimal               @db.Decimal(12, 2)
+  note                     String?
+  idempotency_key          String?               @unique @db.VarChar(255)
+  created_at               DateTime              @default(now()) @db.Timestamp(6)
+  booking_group            BookingGroup?         @relation(fields: [booking_group_id], references: [id])
+  booking                  Booking?              @relation(fields: [booking_id], references: [id])
+  payout                   Payout?               @relation(fields: [payout_id], references: [id])
+  reference_transaction    Transaction?          @relation(fields: [reference_transaction_id], references: [id])
+  wallet                   Wallet                @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+
+  @@index([wallet_id, created_at])
+  @@index([booking_id])
+  @@index([payout_id])
+  @@map("wallet_transactions")
+}
+
+/// Phân bổ tiền cho owner theo từng Booking (sau thanh toán group / tách đơn).
+model BookingPayoutAllocation {
+  id           String                        @id @default(uuid()) @db.Uuid
+  booking_id   String                        @unique @db.Uuid
+  owner_id     String                        @db.Uuid
+  gross_amount Decimal                       @db.Decimal(12, 2)
+  platform_fee Decimal                       @default(0) @db.Decimal(12, 2)
+  net_amount   Decimal                       @db.Decimal(12, 2)
+  status       BookingPayoutAllocationStatus @default(PENDING)
+  created_at   DateTime                      @default(now()) @db.Timestamp(6)
+  updated_at   DateTime                      @updatedAt @db.Timestamp(6)
+  booking      Booking                       @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  owner        User                          @relation(fields: [owner_id], references: [id])
+
+  @@index([owner_id, status])
+  @@map("booking_payout_allocations")
+}
+
+/// Yêu cầu rút tiền của owner (admin duyệt / chuyển khoản).
+model Payout {
+  id                  String              @id @default(uuid()) @db.Uuid
+  owner_id            String              @db.Uuid
+  wallet_id           String              @db.Uuid
+  amount              Decimal             @db.Decimal(12, 2)
+  status              PayoutRequestStatus @default(PENDING)
+  bank_name           String?             @db.VarChar(255)
+  bank_account        String?             @db.VarChar(100)
+  bank_owner_name     String?             @db.VarChar(255)
+  admin_note          String?
+  rejection_reason    String?
+  processed_at        DateTime?           @db.Timestamp(6)
+  processed_by_id     String?             @db.Uuid
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime            @updatedAt @db.Timestamp(6)
+  owner               User                @relation("OwnerPayouts", fields: [owner_id], references: [id])
+  processed_by        User?               @relation("AdminProcessedPayouts", fields: [processed_by_id], references: [id])
+  wallet              Wallet              @relation(fields: [wallet_id], references: [id])
+  wallet_transactions WalletTransaction[]
+
+  @@index([owner_id, status])
+  @@index([wallet_id, status])
+  @@map("payouts")
+}
+
+model Conversation {
+  id              String    @id @default(uuid()) @db.Uuid
+  renter_id       String    @db.Uuid
+  owner_id        String    @db.Uuid
+  last_message    String?
+  last_message_at DateTime  @default(now())
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  owner           User      @relation("OwnerConv", fields: [owner_id], references: [id])
+  renter          User      @relation("RenterConv", fields: [renter_id], references: [id])
+  messages        Message[]
+
+  @@unique([renter_id, owner_id])
+  @@index([owner_id], map: "idx_conversations_owner_id")
+  @@index([renter_id], map: "idx_conversations_renter_id")
+  @@index([renter_id, owner_id], map: "idx_conversations_renter_owner")
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(uuid()) @db.Uuid
+  conversation_id String       @db.Uuid
+  sender_id       String       @db.Uuid
+  content         String
+  attachment_url  String?
+  is_read         Boolean      @default(false)
+  created_at      DateTime     @default(now())
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+  sender          User         @relation("MessageSender", fields: [sender_id], references: [id])
+
+  @@index([conversation_id, created_at])
+  @@index([sender_id])
+  @@index([conversation_id, created_at], map: "idx_messages_conversation_created")
+  @@index([conversation_id], map: "idx_messages_conversation_id")
+  @@index([is_read], map: "idx_messages_is_read")
+  @@index([sender_id], map: "idx_messages_sender_id")
+  @@map("messages")
+}
+
+model SystemLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actor_id    String?  @db.Uuid
+  action      String
+  description String
+  created_at  DateTime @default(now())
+
+  @@map("system_logs")
+}
+
+model Notification {
+  id           String           @id @default(uuid()) @db.Uuid
+  user_id      String           @db.Uuid
+  title        String
+  content      String
+  is_read      Boolean          @default(false)
+  created_at   DateTime         @default(now())
+  type         NotificationType @default(SYSTEM)
+  reference_id String?          @db.Uuid
+  user         User             @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, is_read])
+  @@map("notifications")
 }
 
 enum PromotionSponsor {
-  PLATFORM    // Sàn tài trợ (Sàn chịu phí)
-  OWNER       // Chủ máy tài trợ (Chủ máy chịu phí)
+  PLATFORM
+  OWNER
 }
 
 enum BookingGroupStatus {
@@ -21,89 +496,75 @@ enum BookingGroupStatus {
   PAID
   FAILED
   CANCELLED
-PARTIALLY_PAID
-REFUNDED
+  PARTIALLY_PAID
+  REFUNDED
 }
+
 enum NotificationType {
- SYSTEM    // Thông báo hệ thống chung
- BOOKING   // Thông báo liên quan đến đơn thuê        
- MESSAGE    // Thông báo tin nhắn/chat           
- PROMOTION   // Thông báo khuyến mãi
-            
+  SYSTEM
+  BOOKING
+  MESSAGE
+  PROMOTION
 }
 
 enum Role {
-  USER       // Người thuê 
-  OWNER      // Chủ sở hữu thiết bị cho thuê
-  ADMIN      // Quản trị viên hệ thống
+  USER
+  OWNER
+  ADMIN
 }
-
-
 
 enum AccountStatus {
-  ACTIVE     // Tài khoản hoạt động bình thường
-  LOCKED     // Tài khoản bị khóa
+  ACTIVE
+  LOCKED
 }
-
-
 
 enum AuthProvider {
-  LOCAL      // Đăng nhập bằng email/password
-  GOOGLE     // Đăng nhập Google OAuth
-  FACEBOOK   // Đăng nhập Facebook OAuth
+  LOCAL
+  GOOGLE
+  FACEBOOK
 }
-
-
-
-
 
 enum ApprovalStatus {
-  PENDING    // Đang chờ admin duyệt
-  APPROVED   // Đã được duyệt
-  REJECTED   // Bị từ chối
+  PENDING
+  APPROVED
+  REJECTED
 }
 
-
-
 enum BookingStatus {
-  PENDING      // Đơn mới tạo, chờ xác nhận/thanh toán
-  CONFIRMED    // Chủ đã xác nhận đơn
-  ACTIVE       // Đang trong thời gian thuê
-  COMPLETED    // Đã trả thiết bị hoàn tất
-  CANCELLED    // Đơn bị hủy
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
   REJECTED
   OVERDUE
 }
 
 enum DeliveryMethod {
-  SELF_PICKUP  // Người thuê tự đến lấy thiết bị
-  DELIVERY     // Chủ giao thiết bị tận nơi
+  SELF_PICKUP
+  DELIVERY
 }
 
 enum DisputeStatus {
-  PENDING      // Khiếu nại mới tạo
-  PROCESSING   // Admin đang xử lý
-  RESOLVED     // Đã giải quyết xong
-  REJECTED     // Khiếu nại bị từ chối
+  PENDING
+  PROCESSING
+  RESOLVED
+  REJECTED
 }
 
-
-
-
-
 enum TransactionType {
-  DEPOSIT       // Giao dịch tiền cọc
-  RENTAL_FEE    // Tiền thuê thiết bị
-  REFUND        // Hoàn tiền cho khách
-  COMMISSION    // Hoa hồng nền tảng giữ lại
-  PAYOUT        // Thanh toán doanh thu cho chủ thiết bị
+  DEPOSIT
+  RENTAL_FEE
+  REFUND
+  COMMISSION
+  PAYOUT
 }
 
 enum TransactionStatus {
-  PENDING       // Giao dịch đang chờ xử lý
-  SUCCESS       // Thanh toán thành công
-  FAILED        // Thanh toán thất bại
-  CANCELLED     // Giao dịch bị hủy
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
 }
 
 /// Bucket ví bị ảnh hưởng bởi dòng sổ cái (khớp available_balance / pending_balance).
@@ -113,15 +574,15 @@ enum WalletBalanceBucket {
 }
 
 enum WalletLedgerDirection {
-  CREDIT // Tăng số dư bucket
-  DEBIT  // Giảm số dư bucket
+  CREDIT
+  DEBIT
 }
 
 /// Phân bổ doanh thu owner theo từng Booking.
 enum BookingPayoutAllocationStatus {
-  PENDING    // Đã ghi nhận số tiền, chờ mốc nghiệp vụ (vd. đang thuê)
-  AVAILABLE  // Được tính vào số dư rút được / sổ AVAILABLE
-  PAID       // Đã chi qua Payout (hoặc đánh dấu đã trả)
+  PENDING
+  AVAILABLE
+  PAID
 }
 
 /// Lệnh rút tiền owner về ngân hàng.
@@ -133,587 +594,25 @@ enum PayoutRequestStatus {
 }
 
 enum PaymentMethod {
-  CASH           // Thanh toán tiền mặt
-  VNPAY          // Thanh toán VNPay
-  MOMO           // Thanh toán MoMo
-  BANK_TRANSFER  // Chuyển khoản ngân hàng
+  CASH
+  VNPAY
+  MOMO
+  BANK_TRANSFER
 }
 
 enum PromotionType {
-  PERCENTAGE     // Giảm theo phần trăm
-                 // VD: giảm 10%
-
-  FIXED_AMOUNT   // Giảm số tiền cố định
-                 // VD: giảm 100.000đ
+  PERCENTAGE
+  FIXED_AMOUNT
 }
 
 enum ExtensionStatus {
-  PENDING        // Yêu cầu gia hạn đang chờ xử lý
-  APPROVED       // Gia hạn được chấp nhận
-  REJECTED       // Gia hạn bị từ chối
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum DepositType {
-  MONEY_PLATFORM   // Cọc tiền qua nền tảng
-                   // Hệ thống giữ tiền cọc
-
-  MONEY_DIRECT     // Cọc tiền trực tiếp cho chủ máy
-                   // Platform không giữ tiền
-
-  PAPERWORK        // Cọc giấy tờ
-                   // VD: CCCD, hộ chiếu
-}
-
-
-
-
-// ==========================================
-// 1. NGƯỜI DÙNG & XÁC THỰC
-// ==========================================
-model User {
-  id              String         @id @default(uuid()) @db.Uuid  // ID chính của user
-  email           String         @unique 			// Email đăng nhập
-  password_hash   String?        				// Mật khẩu đã hash
-  full_name       String?        				// Họ tên người dùng
-  phone           String?        				// Số điện thoại
-  address         String?        				// Địa chỉ
-
-  role            Role           @default(USER) 		// USER / OWNER / ADMIN
-  status          AccountStatus  @default(ACTIVE) 		// ACTIVE / LOCKED
-  is_deleted      Boolean        @default(false) 		// Soft delete
-  auth_provider   AuthProvider   @default(LOCAL) 		// LOCAL / GOOGLE / FACEBOOK
-  provider_id     String?        				// ID OAuth từ Google/Facebook
-  bank_detail     BankDetail?
-  rating_avg              Float?                                                                  // Điểm đánh giá trung bình
-  
-  // Các trường mới thêm cho User Profile & Lender
-  avatar_url      String?
-  bio             String?        @db.Text
-  created_at      DateTime       @default(now())
-  updated_at      DateTime       @updatedAt @default(now())
-  cccd_front      String?
-  cccd_back       String?
-  kyc_status      ApprovalStatus?
-
-  disputes_reported Dispute[] 					// Các dispute user đã báo cáo
-  lens_listings     LensListing[] 				// Thiết bị user đăng cho thuê
-  cart              Cart? 					// Giỏ hàng
-  wallet            Wallet?  // Thêm dòng này (1 User có 1 Wallet)
-  transactions      Transaction[] 				// Lịch sử giao dịch
-  notifications     Notification[] 				// Thông báo
-  sent_messages     Message[] @relation("MessageSender") 					// Tin nhắn đã gửi
-  created_promotions Promotion[] @relation("PromotionCreator")
-  booking_groups BookingGroup[]
-  rented_bookings Booking[] @relation("RenterRelation")
-  owned_bookings  Booking[] @relation("OwnerRelation")
-  reviews_written   Review[]  @relation("Reviewer")     // Những review user này đi viết
-  reviews_received  Review[]  @relation("ReviewedUser") // Những review user này nhận được (BỊ đánh giá)
-
-  conversations_as_renter Conversation[] @relation("RenterConv") // Chat với vai trò người thuê
-  conversations_as_owner  Conversation[] @relation("OwnerConv") // Chat với vai trò chủ máy
-
-  booking_payout_allocations BookingPayoutAllocation[]
-  payouts_as_owner           Payout[]                  @relation("OwnerPayouts")
-  payouts_processed_as_admin Payout[]                  @relation("AdminProcessedPayouts")
-
-  @@map("users") 
-}
-
-
-model BankDetail {
-  id              String   @id @default(uuid()) @db.Uuid
-  user_id         String   @unique @db.Uuid // 1 User chỉ có 1 BankDetail
-  bank_name       String?        				// Tên ngân hàng
-  bank_account    String?        				// Số tài khoản ngân hàng
-  bank_owner      String?        				// Chủ tài khoản ngân hàng
-  
-  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  @@map("bank_details")
-}
-
-
-
-// ==========================================
-// 2. GIỎ HÀNG (Dành cho Người thuê)
-// ==========================================
-model Cart {
-  id        String     @id @default(uuid()) @db.Uuid 			// ID giỏ hàng
-  user_id   String     @unique @db.Uuid 				// Mỗi user chỉ có 1 cart
-  user      User       @relation(fields: [user_id], references: [id]) 	// User sở hữu cart
-  items     CartItem[] 							// Danh sách sản phẩm trong giỏ hàng
-  @@map("carts") 
-}
-
-
-model CartItem {
-  id         String      @id @default(uuid()) @db.Uuid                  // ID của item trong giỏ hàng
-  cart_id    String      @db.Uuid                                       // ID cart chứa item này
-  lens_id    String      @db.Uuid                                       // ID thiết bị/lens được thuê
-  quantity   Int         @default(1)                                    // Số lượng thuê
-  start_date DateTime    @db.Date                                       // Ngày bắt đầu thuê
-  end_date   DateTime    @db.Date                                       // Ngày kết thúc thuê
-  cart       Cart        @relation(fields: [cart_id], references: [id]) // Quan hệ tới Cart
-  lens       LensListing @relation(fields: [lens_id], references: [id]) // Quan hệ tới LensListing
-
-  @@map("cart_items") 
-}
-
-// ==========================================
-// 3. THIẾT BỊ & THÔNG SỐ
-// ==========================================
-model Category {
-  id             String        @id @default(uuid()) @db.Uuid         // ID danh mục
-  name           String        @unique                               // Tên danh mục, không được trùng
-  description    String?       @db.Text                              // Mô tả danh mục
-  created_at     DateTime      @default(now()) @db.Timestamp(6)      // Thời gian tạo danh mục
-  lens_listings  LensListing[]                                       // Danh sách thiết bị thuộc danh mục
-  @@map("categories") 
-}
-
-
-
-
-model LensListing {
-  id                      String               @id @default(uuid()) @db.Uuid                      // ID thiết bị cho thuê
-  owner_id                String               @db.Uuid                                           // ID chủ sở hữu thiết bị
-  title                   String                                                                  // Tiêu đề bài đăng
-  description             String?              @db.Text                                          // Mô tả chi tiết thiết bị
-  quantity                Int                  @default(1)                                       // Tổng số lượng thiết bị có thể cho thuê
-  brand                   String?                                                                 // Hãng sản xuất
-  category_id             String?              @db.Uuid                                           // ID danh mục
-  category                Category?            @relation(fields: [category_id], references: [id]) // Quan hệ tới Category
-  approval_status         ApprovalStatus       @default(PENDING)                                 // Trạng thái duyệt bài đăng
-
-  city                    String?                                                                 // Thành phố
-  district                String?                                                                 // Quận/Huyện
-  ward                    String?                                                                 // Phường/Xã
-
-   price_per_day           Decimal              @db.Decimal(12,2)                                       // Giá thuê mỗi ngày
-   thumbnail               String?                                                                 // Ảnh thumbnail đại diện
-   rating_avg              Float?                                                                  // Điểm đánh giá trung bình
-   review_count Int @default(0)
-   available               Boolean              @default(true)                                   // Có sẵn để thuê
-   is_deleted              Boolean              @default(false)                                  // Soft delete
- 
-   market_value            Decimal?             @db.Decimal(12,2)                                       // Giá trị thực tế của thiết bị (để tính cọc 50%)
-   allowed_deposit_types   DepositType[]        @default([MONEY_PLATFORM])                       // Chỉ cho phép cọc qua sàn để an toàn 100%
-   required_deposit_amount Decimal?             @db.Decimal(12,2)                                       // Số tiền cọc yêu cầu (tự động tính 50% từ market_value)
- 
- 
-   created_at              DateTime             @default(now()) @db.Timestamp(6)                 // Thời gian tạo bài đăng
-
-  owner                   User                 @relation(fields: [owner_id], references: [id]) // Chủ sở hữu thiết bị
-  specs                   LensSpec?                                                              // Danh sách thông số kỹ thuật
-  images                  LensImage[]                                                             // Danh sách hình ảnh
-  booking_items           BookingItem[]                                                           // Các booking chứa thiết bị này
-  cart_items              CartItem[]                                                              // Các cart item chứa thiết bị này
-  blocked_dates BlockedDate[]
-  promotions        Promotion[]   @relation("LensToPromotion")
-  reviews Review[]
-  @@index([owner_id])
-  @@index([category_id])                                                                        // Index filter category
-  @@index([brand])                                                                              // Index tìm theo hãng
-  @@index([city, district])                                                                     // Index filter vị trí
-  @@index([approval_status, available, is_deleted])                                             // Index filter trạng thái
-
-  @@map("lens_listings") 
-}
-
-
-
-
-
-
-model LensSpec {
-  id                  String      @id @default(uuid()) @db.Uuid
-  lens_id             String      @unique @db.Uuid // Nên thêm @unique vì 1 bài đăng chỉ có 1 bộ thông số
-  focal_length        String?     // Tiêu cự (VD: 24-70mm, 50mm)
-  max_aperture        String?     // Khẩu độ (VD: f/2.8, f/1.4)
-  mount               String?     // Ngàm (Sony E, Canon EF, Fuji X...)
-  sensor_format       String?     // Cảm biến (Full Frame, APS-C, Micro 4/3)
-  image_stabilization Boolean?    // Chống rung (True/False)
-  lens                LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade)
-
-  @@map("lens_specs")
-}
-
-
-
-
-
-
-model LensImage {
-  id          String  @id @default(uuid()) @db.Uuid // ID duy nhất của ảnh
-  lens_id     String  @db.Uuid                      // Khóa ngoại liên kết tới LensListing
-  image_url   String                                // URL lưu ảnh của lens
-  lens        LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade) // Quan hệ với bảng LensListing  
-  @@map("lens_images") 
-}
-
-// ==========================================
-// 4. ĐẶT LỊCH THUÊ & SỰ CỐ
-// ==========================================
-
-model BookingGroup {
-  id                     String            @id @default(uuid()) @db.Uuid
-  user_id                String            @db.Uuid
-  
-  // Tài chính tổng quát
-  sub_total              Decimal           @db.Decimal(12,2) // Tổng tiền gốc của tất cả đơn con cộng lại
-  discount_amount        Decimal           @default(0) @db.Decimal(12,2) // Tổng tiền giảm giá từ Voucher của Platform
-  total_amount           Decimal           @db.Decimal(12,2) // Số tiền thực tế khách phải thanh toán (sub_total - discount)
-  
-  // Thông tin thanh toán
-  payment_method         PaymentMethod     @default(CASH)      // VNPay, MoMo
-  status 		 BookingGroupStatus @default(PENDING)
-  gateway_transaction_id String?           // Lưu mã giao dịch từ VNPay trả về
-  
-  // Liên kết
-  promotion_id           String?           @db.Uuid		//sàn
-  created_at             DateTime          @default(now())
-  updated_at 		 DateTime 	   @updatedAt
-  
-  user                   User              @relation(fields: [user_id], references: [id])
-  promotion   Promotion?   @relation(fields: [promotion_id], references: [id])
-  bookings               Booking[]
-  transactions           Transaction[]
-  wallet_transactions    WalletTransaction[]
-  @@index([gateway_transaction_id])  
-  @@map("booking_groups")   
-}
-
-model Booking {
-  id                     String   @id @default(uuid()) @db.Uuid           // ID duy nhất của booking
-  user_id                String   @db.Uuid                                // Khóa ngoại liên kết tới User
-  owner_id               String   @db.Uuid
-  promotion_id           String?  @db.Uuid                                // Promotion Chủ Thuê
-  booking_group_id String?       @db.Uuid                  
-  start_date             DateTime                                // Ngày bắt đầu thuê
-  end_date               DateTime                                // Ngày kết thúc thuê
-  sub_total           Decimal  @db.Decimal(12,2) // Tổng tiền gốc (chưa trừ khuyến mãi của chủ máy)
-  discount_amount     Decimal  @default(0) @db.Decimal(12,2) // Số tiền được giảm từ Promotion của Chủ máy
-  total_price         Decimal  @db.Decimal(12,2) // Tiền cuối cùng khách phải trả cho đơn con này (sub_total - discount_amount)
-  platform_fee_amount Decimal @default(0) @db.Decimal(12,2)
-  status                 BookingStatus @default(PENDING)                  // Trạng thái booking
-  delivery_method        DeliveryMethod @default(SELF_PICKUP)             // Phương thức nhận/trả hàng
-  delivery_address       String?  @db.Text                                // Địa chỉ giao hàng (nếu có)
-  is_extension_requested Boolean  @default(false)                         // Có yêu cầu gia hạn hay không
-  requested_end_date     DateTime?                               // Ngày kết thúc mới được yêu cầu
-  extension_status       ExtensionStatus?                                 // Trạng thái xử lý yêu cầu gia hạn
-  created_at             DateTime @default(now()) @db.Timestamp(6)        // Thời điểm tạo booking
-  updated_at 		 DateTime @default(now()) @updatedAt
-  user                   User     @relation("RenterRelation", fields: [user_id], references: [id])
-  owner                  User     @relation("OwnerRelation", fields: [owner_id], references: [id])
-  promotion              Promotion?    @relation(fields: [promotion_id], references: [id]) // Quan hệ với Promotion
-  transactions           Transaction[]                                    // Danh sách giao dịch liên quan
-  booking_group    BookingGroup? @relation(fields: [booking_group_id], references: [id]) // Thêm quan hệ này
-  reviews                Review[]                                         // Danh sách đánh giá
-  disputes                Dispute[]                                         // Thông tin tranh chấp (nếu có)
-  selected_deposit_type  DepositType                                      // Loại hình đặt cọc được chọn
-  deposit_amount         Decimal? @db.Decimal(12,2)                             // Số tiền cọc
-  deposit_note           String?  @db.Text                                // Ghi chú tài sản/giấy tờ đặt cọc
-  items                  BookingItem[]                                    // Danh sách sản phẩm trong booking
-  wallet_transactions    WalletTransaction[]
-  booking_payout_allocation BookingPayoutAllocation?
-  @@index([start_date, end_date])
-  @@index([status])
-@@index([user_id])
-@@index([owner_id])
-@@index([booking_group_id])
-  @@map("bookings")                                                     // Ánh xạ model tới bảng bookings
-}
-
-
-
-
-model BookingItem {
-  id            String   @id @default(uuid()) @db.Uuid              // ID duy nhất của item trong booking
-  booking_id    String   @db.Uuid                                   // Khóa ngoại liên kết tới Booking
-  lens_id       String   @db.Uuid                                   // Khóa ngoại liên kết tới LensListing
-  quantity      Int      @default(1)                                // Số lượng lens được thuê
-  price_per_day Decimal  @db.Decimal(12,2)                                // Giá thuê mỗi ngày của lens
-  booking       Booking     @relation(fields: [booking_id], references: [id], onDelete: Cascade) // Quan hệ với Booking
-  lens          LensListing @relation(fields: [lens_id], references: [id]) // Quan hệ với LensListing
-  @@map("booking_items")                                            // Ánh xạ model tới bảng booking_items
-}
-
-
-
-// Báo cáo sự cố / Khiếu nại
-model Dispute {
-  id              String   @id @default(uuid()) @db.Uuid                     // ID duy nhất của khiếu nại
-  booking_id      String   @db.Uuid                                  // Khóa ngoại liên kết tới Booking
-  reporter_id     String   @db.Uuid                                          // ID người gửi khiếu nại
-  reason          String   @db.Text                                          // Nội dung/lý do khiếu nại
-  evidence_images String[]                                                   // Danh sách URL ảnh/video bằng chứng
-  status          DisputeStatus @default(PENDING)                            // Trạng thái xử lý khiếu nại
-  admin_note      String?  @db.Text                                          // Ghi chú/phán quyết từ Admin
-  created_at      DateTime @default(now()) @db.Timestamp(6)                  // Thời điểm tạo khiếu nại
-  updated_at      DateTime @updatedAt                                        // Thời điểm cập nhật gần nhất
-  booking         Booking  @relation(fields: [booking_id], references: [id]) // Quan hệ với Booking
-  reporter        User     @relation(fields: [reporter_id], references: [id]) // Quan hệ với User (người báo cáo)
-  @@map("disputes")                                           
-}
-
-
-
-// ==========================================
-// 5. GIAO DỊCH & KHUYẾN MÃI
-// ==========================================
-model Transaction {
-  id                     String    @id @default(uuid()) @db.Uuid              // ID duy nhất của giao dịch
-  booking_id             String?    @db.Uuid                                   // Khóa ngoại liên kết tới Booking
-  booking_group_id String?   @db.Uuid // Giao dịch thanh toán tổng (VNPay, MoMo) của khách
-  user_id                String    @db.Uuid                                   // ID người thực hiện giao dịch
-  amount                 Decimal   @db.Decimal(12,2)                                // Số tiền giao dịch
-  type                   TransactionType                                      // Loại giao dịch
-  status                 TransactionStatus @default(PENDING)                  // Trạng thái giao dịch
-  payment_method         PaymentMethod                                        // Phương thức thanh toán
-  gateway_transaction_id String?   					      // Mã giao dịch trả về từ cổng thanh toán (VNPay/MoMo)
-  description            String?   @db.Text                                   // Mô tả/nội dung giao dịch
-  created_at             DateTime  @default(now()) @db.Timestamp(6)           // Thời điểm tạo giao dịch
-  updated_at             DateTime  @updatedAt                                 // Thời điểm cập nhật gần nhất
-  booking                Booking?   @relation(fields: [booking_id], references: [id]) // Quan hệ với Booking
-  booking_group    BookingGroup?  @relation(fields: [booking_group_id], references: [id])
-  user                   User      @relation(fields: [user_id], references: [id]) // Quan hệ với User
-  wallet_ledger_lines    WalletTransaction[]
-  @@map("transactions")                                                       // Ánh xạ model tới bảng transactions
-  @@index([user_id])
-@@index([booking_id])
-@@index([booking_group_id])
-@@index([gateway_transaction_id])
-@@index([status])
-}
-
-model Promotion {
-  id                String    @id @default(uuid()) @db.Uuid              // ID duy nhất của mã khuyến mãi
-  code              String    @unique                                    // Mã khuyến mãi (VD: "SUMMER2026")
-  sponsor_type        PromotionSponsor @default(PLATFORM)
-  creator_id          String?          @db.Uuid // Nếu là OWNER, lưu ID của chủ máy
-  creator User? @relation("PromotionCreator", fields: [creator_id], references: [id])
-  applicable_lenses LensListing[] @relation("LensToPromotion")
-  discount_type     PromotionType                                        // Loại khuyến mãi (% hoặc số tiền cố định)
-  discount_value    Decimal   @db.Decimal(12,2)                                // Giá trị giảm giá
-  min_order_value   Decimal?  @db.Decimal(12,2)                                // Giá trị đơn hàng tối thiểu để áp mã
-  max_discount_amount Decimal?  @db.Decimal(12,2)				//số tiền giảm tối đa
-  start_date        DateTime  @db.Timestamp(6)                           // Thời gian bắt đầu áp dụng
-  end_date          DateTime  @db.Timestamp(6)                           // Thời gian kết thúc áp dụng
-  usage_limit       Int?                                                // Tổng số lượt sử dụng cho phép
-  used_count        Int       @default(0)                               // Số lượt đã sử dụng thành công
-  is_active         Boolean   @default(true)                            // Trạng thái hoạt động của mã
-  created_at        DateTime  @default(now()) @db.Timestamp(6)          // Thời điểm tạo mã khuyến mãi
-  updated_at        DateTime  @updatedAt                                // Thời điểm cập nhật gần nhất
-  bookings          Booking[]                                           // Danh sách booking áp dụng mã này
-  booking_groups BookingGroup[]
-  @@map("promotions")                                                   // Ánh xạ model tới bảng promotions
-}
-// ==========================================
-// 6. ĐÁNH GIÁ (2 CHIỀU) & CHAT
-// ==========================================
-model Review {
-  id               String       @id @default(uuid()) @db.Uuid
-  reviewer_id      String       @db.Uuid                                    
-  booking_id       String       @db.Uuid
-  lens_id          String?      @db.Uuid 
-  reviewed_user_id String?      @db.Uuid 
-  rating           Int
-  comment          String?      @db.Text
-  owner_reply      String?      @db.Text
-  created_at       DateTime     @default(now()) @db.Timestamp(6)
-  
-  reviewer         User         @relation("Reviewer", fields: [reviewer_id], references: [id])
-  booking          Booking      @relation(fields: [booking_id], references: [id])
-  lens             LensListing? @relation(fields: [lens_id], references: [id], onDelete: Cascade)
-  reviewed_user    User?        @relation("ReviewedUser", fields: [reviewed_user_id], references: [id])
-  
-
-  @@unique([booking_id, lens_id])
-  @@unique([booking_id, reviewed_user_id])
-  @@map("reviews")
-}
-
-
-
-
-
-
-model BlockedDate {
-  id          String      @id @default(uuid()) @db.Uuid                   // ID duy nhất của khoảng thời gian bị chặn
-  lens_id     String      @db.Uuid                                        // Khóa ngoại liên kết tới LensListing
-  blocked_quantity Int @default(1)
-  start_date  DateTime                                           // Ngày bắt đầu chặn lịch
-  end_date    DateTime                                           // Ngày kết thúc chặn lịch
-  reason      String?                                                     // Lý do chặn lịch (VD: mang đi chụp event)
-  lens        LensListing @relation(fields: [lens_id], references: [id], onDelete: Cascade) // Quan hệ với LensListing
-  @@index([lens_id, start_date, end_date])
-  @@map("blocked_dates")                                                  // Ánh xạ model tới bảng blocked_dates
-}
-
-model Wallet {
-  id                String   @id @default(uuid()) @db.Uuid
-  user_id           String   @unique @db.Uuid // Quan hệ 1-1: Mỗi User có đúng 1 Wallet
-  
-  available_balance Decimal  @default(0) @db.Decimal(12,2) // Tiền có thể rút về ngân hàng
-  pending_balance   Decimal  @default(0) @db.Decimal(12,2) // Tiền đang bị giam (khách đang thuê, chờ hoàn tất)
-  
-  created_at        DateTime @default(now()) @db.Timestamp(6)
-  updated_at        DateTime @updatedAt
-
-  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  wallet_transactions WalletTransaction[]
-  payouts             Payout[]
-
-  @@map("wallets")
-}
-
-/// Sổ cái biến động ví — mỗi lần đổi available/pending đều có dòng (append-only, audit).
-model WalletTransaction {
-  id                       String                 @id @default(uuid()) @db.Uuid
-  wallet_id                String                 @db.Uuid
-  booking_id               String?                @db.Uuid
-  booking_group_id         String?                @db.Uuid
-  reference_transaction_id String?                @db.Uuid // Giao dịch cổng (VNPay/MoMo) liên quan
-  payout_id                String?                @db.Uuid
-
-  bucket    WalletBalanceBucket
-  direction WalletLedgerDirection
-  amount    Decimal               @db.Decimal(12, 2) // Luôn dương; CREDIT/DEBIT + bucket quy định nghĩa
-
-  available_before Decimal @db.Decimal(12, 2)
-  available_after  Decimal @db.Decimal(12, 2)
-  pending_before   Decimal @db.Decimal(12, 2)
-  pending_after    Decimal @db.Decimal(12, 2)
-
-  note             String?  @db.Text
-  idempotency_key  String?  @unique @db.VarChar(255)
-  created_at       DateTime @default(now()) @db.Timestamp(6)
-
-  wallet                Wallet         @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
-  booking               Booking?       @relation(fields: [booking_id], references: [id], onDelete: SetNull)
-  booking_group         BookingGroup?  @relation(fields: [booking_group_id], references: [id], onDelete: SetNull)
-  reference_transaction Transaction?   @relation(fields: [reference_transaction_id], references: [id], onDelete: SetNull)
-  payout                Payout?        @relation(fields: [payout_id], references: [id], onDelete: SetNull)
-
-  @@index([wallet_id, created_at])
-  @@index([booking_id])
-  @@index([payout_id])
-  @@map("wallet_transactions")
-}
-
-/// Phân bổ tiền cho owner theo từng Booking (sau thanh toán group / tách đơn).
-model BookingPayoutAllocation {
-  id              String                        @id @default(uuid()) @db.Uuid
-  booking_id      String                        @unique @db.Uuid
-  owner_id        String                        @db.Uuid
-  gross_amount    Decimal                       @db.Decimal(12, 2)
-  platform_fee    Decimal                       @default(0) @db.Decimal(12, 2)
-  net_amount      Decimal                       @db.Decimal(12, 2)
-  status          BookingPayoutAllocationStatus @default(PENDING)
-  created_at      DateTime                      @default(now()) @db.Timestamp(6)
-  updated_at      DateTime                      @updatedAt @db.Timestamp(6)
-
-  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
-  owner   User    @relation(fields: [owner_id], references: [id], onDelete: Restrict)
-
-  @@index([owner_id, status])
-  @@map("booking_payout_allocations")
-}
-
-/// Yêu cầu rút tiền của owner (admin duyệt / chuyển khoản).
-model Payout {
-  id                 String              @id @default(uuid()) @db.Uuid
-  owner_id           String              @db.Uuid
-  wallet_id          String              @db.Uuid
-  amount             Decimal             @db.Decimal(12, 2)
-  status             PayoutRequestStatus @default(PENDING)
-
-  bank_name         String? @db.VarChar(255)
-  bank_account      String? @db.VarChar(100)
-  bank_owner_name   String? @db.VarChar(255)
-
-  admin_note         String?   @db.Text
-  rejection_reason   String?   @db.Text
-  processed_at       DateTime? @db.Timestamp(6)
-  processed_by_id    String?   @db.Uuid
-
-  created_at DateTime @default(now()) @db.Timestamp(6)
-  updated_at DateTime @updatedAt @db.Timestamp(6)
-
-  owner        User   @relation("OwnerPayouts", fields: [owner_id], references: [id], onDelete: Restrict)
-  wallet       Wallet @relation(fields: [wallet_id], references: [id], onDelete: Restrict)
-  processed_by User?  @relation("AdminProcessedPayouts", fields: [processed_by_id], references: [id], onDelete: SetNull)
-
-  wallet_transactions WalletTransaction[]
-
-  @@index([owner_id, status])
-  @@index([wallet_id, status])
-  @@map("payouts")
-}
-
-
-model Conversation {
-  id               String   @id @default(uuid()) @db.Uuid                 // ID duy nhất của cuộc trò chuyện
-  renter_id        String   @db.Uuid                                      // ID người thuê
-  owner_id         String   @db.Uuid                                      // ID chủ sở hữu lens
-  last_message     String?  @db.Text                                      // Nội dung tin nhắn cuối cùng
-  last_message_at  DateTime @default(now())                               // Thời gian gửi tin nhắn cuối cùng
-  created_at       DateTime @default(now())                               // Thời điểm tạo cuộc trò chuyện
-  updated_at       DateTime @updatedAt                                    // Thời điểm cập nhật gần nhất
-  renter           User      @relation("RenterConv", fields: [renter_id], references: [id]) // Quan hệ với User thuê
-  owner            User      @relation("OwnerConv", fields: [owner_id], references: [id]) // Quan hệ với User chủ lens
-  messages         Message[]                                              // Danh sách tin nhắn trong cuộc trò chuyện
-  @@unique([renter_id, owner_id])                                         // Đảm bảo chỉ có 1 cuộc trò chuyện giữa renter và owner
-  @@map("conversations")                                                  // Ánh xạ model tới bảng conversations
-}
-
-
-model Message {
-  id              String   @id @default(uuid()) @db.Uuid                   // ID duy nhất của tin nhắn
-  conversation_id String   @db.Uuid                                        // Khóa ngoại liên kết tới Conversation
-  sender_id       String   @db.Uuid                                        // ID người gửi tin nhắn
-
-  content         String   @db.Text                                        // Nội dung tin nhắn
-  attachment_url  String?                                                   // URL file đính kèm (ảnh, tài liệu, ...)
-  is_read         Boolean  @default(false)                                 // Trạng thái đã đọc hay chưa
-
-  created_at      DateTime @default(now())                                 // Thời điểm gửi tin nhắn
-
-  conversation    Conversation @relation(fields: [conversation_id], references: [id]) // Quan hệ với Conversation
-  sender          User         @relation("MessageSender", fields: [sender_id], references: [id])
-
-  @@index([conversation_id, created_at]) // Thêm vào model Message
-  @@index([sender_id])
-
-  @@map("messages")                                                         // Ánh xạ model tới bảng messages
-}
-
-
-
-
-// ==========================================
-// 7. LOGS & THÔNG BÁO
-// ==========================================
-model SystemLog {
-  id          String   @id @default(uuid()) @db.Uuid         // ID duy nhất của log hệ thống
-  actor_id    String?   @db.Uuid // Có thể null nếu là hệ thống tự chạy (cronjob)
-  action      String                                         // Hành động được ghi nhận trong hệ thống
-  description String   @db.Text                              // Mô tả chi tiết hành động hoặc sự kiện
-  created_at  DateTime @default(now())                      // Thời điểm tạo log
-
-  @@map("system_logs")                                      // Ánh xạ model tới bảng system_logs
-}
-
-model Notification {
-  id            String   @id @default(uuid()) @db.Uuid                    // ID duy nhất của thông báo
-  user_id       String   @db.Uuid                                         // ID người nhận thông báo
-  title         String                                                    // Tiêu đề thông báo
-  content       String   @db.Text                                         // Nội dung chi tiết thông báo
-  is_read       Boolean  @default(false)                                  // Trạng thái đã đọc hay chưa
-  created_at    DateTime @default(now())                                  // Thời điểm tạo thông báo
-  type          NotificationType @default(SYSTEM)                         // Loại thông báo
-  reference_id  String?  @db.Uuid                                         // ID tham chiếu tới booking, message,...
-  user          User     @relation(fields: [user_id], references: [id])   // Quan hệ với User
-@@index([user_id, is_read])
-  @@map("notifications")                                                  // Ánh xạ model tới bảng notifications
+  MONEY_PLATFORM
+  MONEY_DIRECT
+  PAPERWORK
 }

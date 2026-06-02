@@ -21,37 +21,77 @@ export default function Header() {
   // States quản lý User
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userPicture, setUserPicture] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Kiểm tra trạng thái đăng nhập khi component mount
+  // 👑 GỘP CHUNG LOGIC XỬ LÝ AUTH (LOCAL + GOOGLE OAUTH)
   useEffect(() => {
+    // 1. Kiểm tra và xử lý dữ liệu từ Google Redirect trước
+    const params = new URLSearchParams(location.search);
+    const urlToken = params.get('token');
+    const urlEmail = params.get('email');
+    const urlFullName = params.get('fullName');
+    const urlPicture = params.get('picture');
+
+    if (urlToken) {
+      localStorage.setItem('token', urlToken);
+      localStorage.setItem('email', urlEmail || '');
+      localStorage.setItem('fullName', urlFullName || 'Người dùng');
+      localStorage.setItem('picture', urlPicture || '');
+
+      setIsLoggedIn(true);
+      setUserName(urlFullName || 'Người dùng');
+      setUserPicture(urlPicture || '');
+
+      // Xóa query params trên URL một cách mượt mà thông qua React Router
+      navigate(location.pathname, { replace: true });
+      return; // Dừng lại ở đây vì đã xử lý xong login từ Google
+    }
+
+    // 2. Nếu không có query params, kiểm tra localStorage như bình thường
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     
     if (token) {
       setIsLoggedIn(true);
-      // Gọi API lấy thông tin user thật
-      import('../../services/user.service').then(({ userService }) => {
-        userService.getMe()
-          .then(res => {
-            if (res.data) {
-              setUserName(res.data.full_name || 'Người dùng');
-              localStorage.setItem('userName', res.data.full_name || 'Người dùng');
-              if (res.data.avatar_url) {
-                localStorage.setItem('avatar_url', res.data.avatar_url);
+      const savedName = localStorage.getItem('fullName') || localStorage.getItem('userName');
+      const savedPicture = localStorage.getItem('picture');
+
+      if (savedName) setUserName(savedName);
+      if (savedPicture) setUserPicture(savedPicture);
+
+      // Nếu có token nhưng thiếu thông tin Name/Avatar -> Gọi API cập nhật
+      if (!savedName || !savedPicture) {
+        import('../../services/user.service').then(({ userService }) => {
+          userService.getMe()
+            .then(res => {
+              if (res.data) {
+                const finalName = res.data.full_name || savedName || 'Người dùng';
+                const finalPicture = res.data.avatar_url || savedPicture || '';
+                
+                setUserName(finalName);
+                setUserPicture(finalPicture);
+                
+                localStorage.setItem('fullName', finalName);
+                if (finalPicture) localStorage.setItem('picture', finalPicture);
               }
-            }
-          })
-          .catch(() => {
-            const savedName = localStorage.getItem('userName');
-            setUserName(savedName || 'Người dùng');
-          });
-      });
+            })
+            .catch((err) => {
+              console.error('Lỗi khi lấy thông tin user:', err);
+              setUserName(savedName || 'Người dùng');
+            });
+        });
+      }
+    } else {
+      // Trường hợp không có token (chưa đăng nhập hoặc đã đăng xuất)
+      setIsLoggedIn(false);
+      setUserName('');
+      setUserPicture('');
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search, navigate]); // Chạy lại khi chuyển trang hoặc URL có query mới
 
   // Xử lý click ra ngoài để đóng User Menu
   useEffect(() => {
@@ -73,7 +113,7 @@ export default function Header() {
         setSuggestions([]);
         setShowDropdown(false);
       }
-    }, 300); // delay 300ms
+    }, 300);
 
     return () => clearTimeout(timeout);
   }, [query]);
@@ -111,12 +151,12 @@ export default function Header() {
 
   // Hàm xử lý Đăng xuất
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userName');
+    localStorage.clear(); // Xóa sạch để tránh sót token cũ
     setIsLoggedIn(false);
     setUserName('');
+    setUserPicture('');
     setShowUserMenu(false);
-    navigate('/'); // Đưa về trang chủ
+    navigate('/');
   };
 
   return (
@@ -205,7 +245,22 @@ export default function Header() {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 ref={userMenuRef}
               >
-                <Icon name="account_circle" className="dark-header__action-icon" />
+                {userPicture ? (
+                  <img 
+                    src={userPicture} 
+                    alt={userName}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      marginRight: '8px'
+                    }}
+                  />
+                ) : (
+                  <Icon name="account_circle" className="dark-header__action-icon" />
+                )}
+                
                 <div className="dark-header__action-text">
                   <span className="label">Xin chào,</span>
                   <strong className="value">{userName}</strong>
