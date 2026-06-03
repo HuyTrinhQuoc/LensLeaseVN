@@ -11,6 +11,7 @@ import { CartModule } from './modules/cart/cart.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { AdminUserModule } from './admin-user/admin-user.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     BookingsModule,
     WalletModule,
     PaymentsModule,
+    AdminUserModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, MailService],
