@@ -117,7 +117,7 @@ export default function AppRoutes() {
           ══════════════════════════════════════════════ */}
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/login-success" element={<LoginSuccess />} />
+      <Route path="/login/success" element={<LoginSuccess />} />
       <Route path="/verify" element={<VerifyEmail />} />
     </Routes>
   );

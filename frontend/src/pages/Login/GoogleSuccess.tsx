@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
-// Hàm hỗ trợ giải mã JWT (không cần thư viện ngoài)
+// Hàm hỗ trợ giải mã JWT
 const parseJwt = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
@@ -23,10 +23,24 @@ const LoginSuccess = () => {
   useEffect(() => {
     const token = searchParams.get('token');
     
+    // Lấy thêm các thông tin user từ URL
+    const email = searchParams.get('email');
+    const fullName = searchParams.get('fullName');
+    const picture = searchParams.get('picture');
+    
     if (token) {
+      // 1. Lưu token
       localStorage.setItem('token', token);
       
-      // Giải mã token để lấy thông tin role
+      // 2. Lưu thông tin User (để sau này hiển thị Avatar, Tên ở Header)
+      const userInfo = {
+        email: email || '',
+        fullName: fullName || '',
+        picture: picture || ''
+      };
+      localStorage.setItem('user_profile', JSON.stringify(userInfo));
+      
+      // 3. Giải mã token để lấy thông tin role điều hướng
       const decodedToken = parseJwt(token);
       
       if (decodedToken?.role === 'ADMIN') {
@@ -40,7 +54,11 @@ const LoginSuccess = () => {
     }
   }, [searchParams, navigate]);
 
-  return <p>Đang xử lý đăng nhập...</p>;
+  return (
+    <div className="flex items-center justify-center h-screen bg-surface-container-lowest">
+       <p className="text-lg font-medium text-on-surface-variant">Đang xử lý đăng nhập...</p>
+    </div>
+  );
 };
 
 export default LoginSuccess;

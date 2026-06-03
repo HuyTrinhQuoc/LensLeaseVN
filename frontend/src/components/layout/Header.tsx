@@ -245,21 +245,7 @@ export default function Header() {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 ref={userMenuRef}
               >
-                {userPicture ? (
-                  <img 
-                    src={userPicture} 
-                    alt={userName}
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      marginRight: '8px'
-                    }}
-                  />
-                ) : (
-                  <Icon name="account_circle" className="dark-header__action-icon" />
-                )}
+         
                 
                 <div className="dark-header__action-text">
                   <span className="label">Xin chào,</span>
