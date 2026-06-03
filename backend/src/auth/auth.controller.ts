@@ -44,7 +44,9 @@ export class AuthController {
       picture: result.user.avatar_url || '',
     }).toString();
     
-    return res.redirect(`http://localhost:5173?${queryParams}`);
+    // Khuyên dùng biến môi trường để sau này deploy không bị lỗi
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+return res.redirect(`${frontendUrl}/login/success?${queryParams}`);
   }
 
   // 🆕 GET: /auth/me - Lấy thông tin user hiện tại

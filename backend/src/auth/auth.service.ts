@@ -111,6 +111,7 @@ export class AuthService {
         email: user.email,
         full_name: user.full_name,
         avatar_url: user.avatar_url,
+        role: user.role,
       }
     };
   }
@@ -118,9 +119,8 @@ export class AuthService {
 
 // 3. ĐĂNG NHẬP GOOGLE (Lưu DB + Trả Token)
 async googleLogin(req: any) {
-  console.log('2. Dữ liệu req.user:', req.user); // 👈 Thêm dòng này
   const { email, firstName, lastName, avatar_url, provider_id } = req.user;
-  console.log('3. provider_id bóc tách được:', provider_id); // 👈 Thêm dòng này
+
   const fullName = `${firstName} ${lastName}`.trim();
 
   let user = await this.prisma.user.findUnique({ where: { email } });
@@ -159,6 +159,7 @@ async googleLogin(req: any) {
       email: user.email,
       full_name: user.full_name,
       avatar_url: user.avatar_url,
+      role: user.role,
     }
   };
 }
