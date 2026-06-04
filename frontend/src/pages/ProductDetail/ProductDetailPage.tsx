@@ -1,101 +1,30 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import ProductGallery from "../../components/product-detail/ProductGallery";
 import BookingSidebar from "../../components/product-detail/BookingSidebar"; 
 import ProductSpecs from "../../components/product-detail/ProductSpecs";
 import ProductCard from "../../components/layout/ProductCard";
 import Pagination from "../../components/common/Pagination";
-import { ProductService } from "../../services/product.service";
-import type { ProductItem } from "../../type/product.type";
-
-interface PaginatedApiResponse {
-  message?: string;
-  data: ProductItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+import { useSupabaseLensById, useSupabaseLens } from "../../hooks/useSupabaseLens";
 
 const RELATED_PER_PAGE = 4;
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // ============== STATE CHO SẢN PHẨM LIÊN QUAN ==============
-  const [relatedItems, setRelatedItems] = useState<ProductItem[]>([]);
   const [relatedPage, setRelatedPage] = useState(1);
-  const [relatedTotalPages, setRelatedTotalPages] = useState(1);
-  const [relatedTotal, setRelatedTotal] = useState(0);
-  const [relatedLoading, setRelatedLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchDetail = async () => {
-      if (!id) return;
-      
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const data = await ProductService.getProductById(id);
-        setProduct(data);
-      } catch (err: any) {
-        const errorMessage = 
-          err.response?.data?.message || 
-          err.message || 
-          "Có lỗi xảy ra khi tải dữ liệu";
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Fetch chi tiết sản phẩm từ Supabase
+  const { product, loading, error } = useSupabaseLensById(id || '');
 
-    fetchDetail();
-    // Reset related products page khi chuyển sản phẩm
-    setRelatedPage(1);
-  }, [id]);
+  // Fetch sản phẩm liên quan
+  const related = useSupabaseLens({
+    page: relatedPage,
+    limit: RELATED_PER_PAGE,
+    category: product?.category?.id,
+    brand: product?.brand as string | undefined,
+  });
 
-  // Fetch sản phẩm liên quan (cùng brand hoặc category)
-  const fetchRelated = useCallback(async () => {
-    if (!product) return;
-
-    setRelatedLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append("page", relatedPage.toString());
-      params.append("limit", RELATED_PER_PAGE.toString());
-      
-      // Lọc theo category nếu có, fallback theo brand
-      if (product.category?.id) {
-        params.append("category", product.category.id);
-      } else if (product.brand) {
-        params.append("brand", product.brand);
-      }
-
-      const res = await fetch(`http://localhost:3000/lenses?${params.toString()}`);
-      const data: PaginatedApiResponse = await res.json();
-
-      // Loại bỏ sản phẩm hiện tại khỏi danh sách liên quan
-      const filtered = (data.data || []).filter((item) => item.id !== id);
-      setRelatedItems(filtered);
-      // Điều chỉnh totalPages nếu cần (vì đã loại bỏ 1 item)
-      setRelatedTotalPages(data.totalPages || 1);
-      setRelatedTotal(Math.max(0, (data.total || 0) - 1));
-    } catch (err) {
-      console.error("Lỗi khi tải sản phẩm liên quan:", err);
-    } finally {
-      setRelatedLoading(false);
-    }
-  }, [product, relatedPage, id]);
-
-  useEffect(() => {
-    fetchRelated();
-  }, [fetchRelated]);
-
-  if (loading) {
+  if (!product || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
         <div className="flex flex-col items-center gap-4">
@@ -106,12 +35,12 @@ export default function ProductDetailPage() {
     );
   }
 
-  if (error || !product) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
         <div className="text-center space-y-4">
           <div className="text-6xl">😔</div>
-          <p className="text-red-500 font-medium text-lg">{error || "Không tìm thấy thiết bị!"}</p>
+          <p className="text-red-500 font-medium text-lg">{error.message || "Không tìm thấy thiết bị!"}</p>
           <Link to="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
             ← Quay lại danh sách
           </Link>
@@ -131,7 +60,7 @@ export default function ProductDetailPage() {
           {/* ================= CỘT TRÁI ================= */}
           <div className="w-full lg:w-[65%] space-y-10">
             {/* Khối 1: Hình ảnh */}
-            <ProductGallery images={product.images} thumbnail={product.thumbnail} />
+            <ProductGallery images={product.images} thumbnail={product.thumbnail || undefined} />
 
             {/* Khối 2: Tiêu đề & Thông tin cơ bản */}
             <div className="space-y-4">
@@ -147,7 +76,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Khối 3: Thông số kỹ thuật */}
-            <ProductSpecs brand={product.brand} specs={product.specs} />
+            <ProductSpecs brand={product.brand || undefined} specs={undefined} />
             
             {/* Khối 4: Mô tả thiết bị */}
             {product.description && (
@@ -195,10 +124,11 @@ export default function ProductDetailPage() {
             <div className="lg:sticky lg:top-6 lg:z-20 lg:self-start lg:w-full">
               <BookingSidebar
                 lensId={product.id}
+                ownerId={product.owner_id}
                 pricePerDay={Number(product.price_per_day)}
-                available={product.available !== false && !product.is_deleted}
-                depositAmount={Number(product.required_deposit_amount)}
-                marketValue={product.market_value ? Number(product.market_value) : undefined}
+                available={product.available !== false}
+                depositAmount={Number((product as any).required_deposit_amount || 0)}
+                marketValue={(product as any).market_value ? Number((product as any).market_value) : undefined}
                 lensMeta={{
                   title: product.title,
                   image_url:
@@ -207,14 +137,16 @@ export default function ProductDetailPage() {
                   category_name: product.category?.name,
                   owner_name: product.owner?.full_name,
                   owner_rating:
-                    product.owner?.rating_avg != null ? Number(product.owner.rating_avg) : product.rating_avg != null
+                    product.owner && 'rating_avg' in product.owner
+                      ? Number((product.owner as any).rating_avg)
+                      : product.rating_avg != null
                       ? Number(product.rating_avg)
                       : undefined,
-                  allowed_deposit_types: Array.isArray(product.allowed_deposit_types)
-                    ? [...product.allowed_deposit_types]
+                  allowed_deposit_types: Array.isArray((product as any).allowed_deposit_types)
+                    ? [...(product as any).allowed_deposit_types]
                     : undefined,
-                  required_deposit_amount: product.required_deposit_amount != null
-                    ? Number(product.required_deposit_amount)
+                  required_deposit_amount: (product as any).required_deposit_amount != null
+                    ? Number((product as any).required_deposit_amount)
                     : undefined,
                 }}
               />
@@ -234,9 +166,9 @@ export default function ProductDetailPage() {
               </h2>
               <p className="text-gray-500 mt-2">
                 Các thiết bị tương tự bạn có thể quan tâm
-                {!relatedLoading && relatedTotal > 0 && (
+                {!related.loading && related.total > 0 && (
                   <span className="ml-2 text-sm text-blue-600 font-medium">
-                    ({relatedTotal} thiết bị)
+                    ({Math.max(0, related.total - 1)} thiết bị)
                   </span>
                 )}
               </p>
@@ -249,7 +181,7 @@ export default function ProductDetailPage() {
             </Link>
           </div>
 
-          {relatedLoading ? (
+          {related.loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {Array.from({ length: RELATED_PER_PAGE }).map((_, i) => (
                 <div key={i} className="animate-pulse bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -262,24 +194,26 @@ export default function ProductDetailPage() {
                 </div>
               ))}
             </div>
-          ) : relatedItems.length === 0 ? (
+          ) : related.items.length === 0 ? (
             <div className="py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
               Chưa có thiết bị liên quan nào.
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {relatedItems.map((item) => (
-                  <ProductCard key={item.id} item={item} />
-                ))}
+                {related.items
+                  .filter((item) => item.id !== id)
+                  .map((item) => (
+                    <ProductCard key={item.id} item={item} />
+                  ))}
               </div>
 
               {/* Phân trang sản phẩm liên quan */}
               <div className="mt-8">
                 <Pagination
-                  currentPage={relatedPage}
-                  totalPages={relatedTotalPages}
-                  onPageChange={(p) => setRelatedPage(p)}
+                  currentPage={related.page}
+                  totalPages={related.totalPages}
+                  onPageChange={setRelatedPage}
                 />
               </div>
             </>

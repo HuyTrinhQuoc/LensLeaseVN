@@ -1,58 +1,34 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import ProductCard from "../../components/layout/ProductCard";
 import Pagination from "../../components/common/Pagination";
-import type { ProductItem } from "../../type/product.type";
-
-interface PaginatedApiResponse {
-  message?: string;
-  data: ProductItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+import { useSupabaseLens } from "../../hooks/useSupabaseLens";
 
 const ITEMS_PER_PAGE = 8;
 
-/**
- * Hook tái sử dụng cho mỗi section phân trang trên trang chủ.
- */
-function usePaginatedSection(baseUrl: string, limit = ITEMS_PER_PAGE) {
-  const [items, setItems] = useState<ProductItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const separator = baseUrl.includes("?") ? "&" : "?";
-      const url = `${baseUrl}${separator}page=${page}&limit=${limit}`;
-      const res = await fetch(url);
-      const data: PaginatedApiResponse = await res.json();
-
-      setItems(data.data || []);
-      setTotalPages(data.totalPages || 1);
-      setTotal(data.total || 0);
-    } catch (error) {
-      console.error("Lỗi khi tải dữ liệu:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [baseUrl, page, limit]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { items, page, setPage, totalPages, total, loading };
-}
-
 export default function HomePage() {
-  const featured = usePaginatedSection("http://localhost:3000/lenses?sort=rating");
-  const wides = usePaginatedSection("http://localhost:3000/lenses?category=e21744ed-e8d6-405f-b494-bdbb218c6762");
-  const cheap = usePaginatedSection("http://localhost:3000/lenses?sort=price_asc");
+  // Sản phẩm nổi bật (sắp xếp theo rating)
+  const [featuredPage, setFeaturedPage] = useState(1);
+  const featured = useSupabaseLens({
+    page: featuredPage,
+    limit: ITEMS_PER_PAGE,
+    sort: 'rating',
+  });
+
+  // Sản phẩm góc rộng (theo category)
+  const [widesPage, setWidesPage] = useState(1);
+  const wides = useSupabaseLens({
+    page: widesPage,
+    limit: ITEMS_PER_PAGE,
+    category: '25e47b22-9799-430e-8e47-d4c9094775d4',
+  });
+
+  // Sản phẩm giá rẻ (sắp xếp theo giá)
+  const [cheapPage, setCheapPage] = useState(1);
+  const cheap = useSupabaseLens({
+    page: cheapPage,
+    limit: ITEMS_PER_PAGE,
+    sort: 'price_asc',
+  });
 
   /** Skeleton loading placeholder */
   const renderSkeleton = () => (
@@ -74,7 +50,8 @@ export default function HomePage() {
   const renderSection = (
     title: string,
     subtitle: string,
-    section: ReturnType<typeof usePaginatedSection>
+    section: ReturnType<typeof useSupabaseLens>,
+    onPageChange: (page: number) => void
   ) => (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-4">
@@ -93,6 +70,13 @@ export default function HomePage() {
           Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
         </button>
       </div>
+
+      {section.error && (
+        <div className="py-6 px-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <p className="font-semibold">Lỗi tải dữ liệu:</p>
+          <p className="text-sm mt-1">{section.error.message}</p>
+        </div>
+      )}
 
       {section.loading ? (
         renderSkeleton()
@@ -113,7 +97,7 @@ export default function HomePage() {
             <Pagination
               currentPage={section.page}
               totalPages={section.totalPages}
-              onPageChange={(p) => section.setPage(p)}
+              onPageChange={onPageChange}
             />
           </div>
         </>
@@ -171,21 +155,24 @@ export default function HomePage() {
         {renderSection(
           "Thiết bị Nổi bật",
           "Những camera và lens được yêu thích nhất trên LensLeaseVN",
-          featured
+          featured,
+          setFeaturedPage
         )}
 
         {/* Danh sách 2: Góc rộng */}
         {renderSection(
           "Thiết bị góc rộng",
           "Khám phá không gian rộng lớn với ống kính Ultrawide",
-          wides
+          wides,
+          setWidesPage
         )}
 
         {/* Danh sách 3: Giá rẻ */}
         {renderSection(
           "Thiết bị giá rẻ",
           "Tiết kiệm chi phí tối đa cho dự án của bạn",
-          cheap
+          cheap,
+          setCheapPage
         )}
 
       </section>
