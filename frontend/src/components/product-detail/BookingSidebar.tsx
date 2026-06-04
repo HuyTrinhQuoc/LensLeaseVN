@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { bookingService } from "../../services/booking.service";
+import { ChatService } from "../../services/chat.service";
 import { useCart } from "../../context/CartContext";
 import {
   calculateRentalDaysLocal,
@@ -25,6 +26,7 @@ export type BookingLensCartMeta = {
 
 interface BookingSidebarProps {
   lensId: string;
+  ownerId: string;
   pricePerDay: number;
   available: boolean;
   depositAmount: number;
@@ -47,6 +49,7 @@ const CALENDAR_POLL_MS = 45_000;
 
 export default function BookingSidebar({
   lensId,
+  ownerId,
   pricePerDay,
   available,
   depositAmount,
@@ -60,6 +63,7 @@ export default function BookingSidebar({
   const [startDate, setStartDate] = useState<string>(todayVietnamYmd());
   const [endDate, setEndDate] = useState<string>(() => addDaysUtcYmd(todayVietnamYmd(), 3));
   const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState("");
   const [calendarMonth, setCalendarMonth] = useState(() => calendarMonthFromYmd(todayVietnamYmd()));
   const [calendar, setCalendar] = useState<any | null>(null);
@@ -345,6 +349,23 @@ export default function BookingSidebar({
       ? new Date(calendarUpdatedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
       : "—";
 
+  const handleChatClick = async () => {
+    try {
+      if (!ownerId) {
+        setError("Chủ sở hữu thiết bị chưa được xác định. Vui lòng tải lại trang.");
+        return;
+      }
+      setChatLoading(true);
+      const conversation = await ChatService.getOrCreateConversation(ownerId);
+      navigate(`/chat?conversation_id=${conversation.id}`);
+    } catch (error) {
+      console.error("Error starting chat:", error);
+      setError("Không thể mở chat. Vui lòng thử lại sau.");
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
       <div className="flex items-start justify-between border-b border-gray-100 pb-6 mb-6">
@@ -506,16 +527,28 @@ export default function BookingSidebar({
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-      <button
-        type="button"
-        onClick={() => void handleAddToCart()}
-        disabled={loading || available === false}
-        className="w-full rounded-xl bg-[#0b45b3] py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
-      >
-        {loading ? BOOKING_SCHEDULE_UI.processing : BOOKING_SCHEDULE_UI.addToCart}
-      </button>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => void handleAddToCart()}
+          disabled={loading || available === false}
+          className="rounded-xl bg-[#0b45b3] py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+        >
+          {loading ? BOOKING_SCHEDULE_UI.processing : BOOKING_SCHEDULE_UI.addToCart}
+        </button>
 
-      <p className="mt-4 text-center text-xs text-gray-400">
+        <button
+          type="button"
+          onClick={() => void handleChatClick()}
+          disabled={chatLoading}
+          className="rounded-xl border-2 border-[#0b45b3] py-3.5 font-bold text-[#0b45b3] transition hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-[20px]">chat</span>
+          <span className="hidden sm:inline">Chat</span>
+        </button>
+      </div>
+
+      <p className="text-center text-xs text-gray-400">
         <Link to="/cart" className="font-semibold text-[#0b45b3]">
           {BOOKING_SCHEDULE_UI.viewCart}
         </Link>

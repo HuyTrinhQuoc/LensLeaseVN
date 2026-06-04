@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ProductItem } from "../../type/product.type";
+import { SupabaseService } from "../../services/supabase.service";
 import ProductCard from "../../components/layout/ProductCard";
 import Pagination from "../../components/common/Pagination";
 
@@ -28,14 +29,17 @@ export default function ProductsPage() {
   // Sử dụng state tạm thời cho form, chỉ khi bấm "Áp dụng" mới fetch
   const [filterMinPrice, setFilterMinPrice] = useState<string>("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>("");
-  const [filterMinRating, setFilterMinRating] = useState<boolean>(false);
+  const [filterBrand, setFilterBrand] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterRating, setFilterRating] = useState<string>("");
   const [filterCity, setFilterCity] = useState<string>("");
 
   // State chính thức được dùng để gọi API
   const [appliedFilters, setAppliedFilters] = useState({
     minPrice: "",
     maxPrice: "",
-    minRating: "",
+    brand: "",
+    category: "",
     city: "",
   });
 
@@ -43,28 +47,26 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
+      const result = await SupabaseService.getLensListings({
+        page,
+        limit: 9,
+        sort,
+        search: search || undefined,
+        minPrice: appliedFilters.minPrice ? parseInt(appliedFilters.minPrice) : undefined,
+        maxPrice: appliedFilters.maxPrice ? parseInt(appliedFilters.maxPrice) : undefined,
+        brand: appliedFilters.brand || undefined,
+        category: appliedFilters.category || undefined,
+        city: appliedFilters.city || undefined,
+      });
       
-      params.append("page", page.toString());
-      params.append("limit", "9"); // Hiển thị 9 item mỗi trang
-      params.append("sort", sort);
-      
-      if (search) params.append("search", search);
-      if (appliedFilters.minPrice) params.append("minPrice", appliedFilters.minPrice);
-      if (appliedFilters.maxPrice) params.append("maxPrice", appliedFilters.maxPrice);
-      if (appliedFilters.minRating) params.append("minRating", appliedFilters.minRating);
-      if (appliedFilters.city) params.append("city", appliedFilters.city);
-
-      const response = await fetch(`http://localhost:3000/lenses?${params.toString()}`);
-      if (!response.ok) throw new Error("Lỗi khi tải dữ liệu");
-      
-      const resData = await response.json() as PaginatedResponse;
-      
-      setProducts(resData.data || []);
-      setTotalPages(resData.totalPages || 1);
-      setTotalItems(resData.total || 0);
+      setProducts(result.data || []);
+      setTotalPages(result.totalPages || 1);
+      setTotalItems(result.total || 0);
     } catch (error) {
-      console.error("Lỗi:", error);
+      console.error("Lỗi tải dữ liệu từ Supabase:", error);
+      setProducts([]);
+      setTotalPages(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,8 @@ export default function ProductsPage() {
     setAppliedFilters({
       minPrice: filterMinPrice,
       maxPrice: filterMaxPrice,
-      minRating: filterMinRating ? "5" : "", // Trust score 5+ map với minRating = 5
+      brand: filterBrand,
+      category: filterCategory,
       city: filterCity,
     });
   };
@@ -113,9 +116,11 @@ export default function ProductsPage() {
                 onClick={() => {
                   setFilterMinPrice("");
                   setFilterMaxPrice("");
-                  setFilterMinRating(false);
+                  setFilterBrand("");
+                  setFilterCategory("");
+                  setFilterRating("");
                   setFilterCity("");
-                  setAppliedFilters({ minPrice: "", maxPrice: "", minRating: "", city: "" });
+                  setAppliedFilters({ minPrice: "", maxPrice: "", brand: "", category: "", city: "" });
                 }}
                 className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors"
               >
@@ -151,22 +156,68 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* Lọc Thương hiệu */}
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Thương hiệu</h3>
+                <div className="relative">
+                  <select 
+                    className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none appearance-none"
+                    value={filterBrand}
+                    onChange={(e) => setFilterBrand(e.target.value)}
+                  >
+                    <option value="">Tất cả thương hiệu</option>
+                    <option value="Canon">Canon</option>
+                    <option value="Nikon">Nikon</option>
+                    <option value="Sony">Sony</option>
+                    <option value="Fujifilm">Fujifilm</option>
+                    <option value="Tamron">Tamron</option>
+                    <option value="Sigma">Sigma</option>
+                    <option value="Tokina">Tokina</option>
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 pointer-events-none">expand_more</span>
+                </div>
+              </div>
+
+              {/* Lọc Loại Lens */}
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Loại Lens</h3>
+                <div className="relative">
+                  <select 
+                    className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none appearance-none"
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                  >
+                    <option value="">Tất cả loại</option>
+                    <option value="0ded0492-9110-4824-a49e-8bac886782dc">Portrait Lens</option>
+                    <option value="25e47b22-9799-430e-8e47-d4c9094775d4">Wide Angle Lens</option>
+                    <option value="3f467dbf-ccfb-474f-a36d-7969620ed461">Cinema Lens</option>
+                    <option value="6507c621-f626-4305-ac1d-37bbd15b72ed">Travel Lens</option>
+                    <option value="981a38d6-4c3b-447b-86fa-92f2e600be3a">Prime Lens</option>
+                    <option value="a044b8b4-b638-4b34-b2d1-9a59782e19fa">Macro Lens</option>
+                    <option value="b90f7709-22bc-46e7-b6fe-1e25d854661e">Event Lens</option>
+                    <option value="f1eace11-f9dd-4797-9a71-b8830506fc6b">Telephoto Lens</option>
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 pointer-events-none">expand_more</span>
+                </div>
+              </div>
+
               {/* Lọc Đánh giá */}
               <div className="space-y-4">
-                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Chất lượng</h3>
-                <label className="flex items-center p-4 bg-orange-50/50 border border-orange-100 rounded-2xl cursor-pointer group hover:bg-orange-50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="w-5 h-5 rounded-md border-orange-200 text-orange-500 focus:ring-orange-200 cursor-pointer"
-                    checked={filterMinRating}
-                    onChange={(e) => setFilterMinRating(e.target.checked)}
-                  />
-                  <div className="ml-3">
-                    <p className="text-sm font-bold text-orange-900">Trust Score 5.0</p>
-                    <p className="text-[10px] text-orange-600 font-medium">Chủ máy uy tín nhất</p>
-                  </div>
-                  <span className="ml-auto text-lg">⭐</span>
-                </label>
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[2px]">Đánh giá</h3>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⭐</span>
+                  <select 
+                    className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 transition-all outline-none appearance-none"
+                    value={filterRating}
+                    onChange={(e) => setFilterRating(e.target.value)}
+                  >
+                    <option value="">Tất cả đánh giá</option>
+                    <option value="5">5.0 sao</option>
+                    <option value="4">4.0+ sao</option>
+                    <option value="3">3.0+ sao</option>
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 pointer-events-none">expand_more</span>
+                </div>
               </div>
 
               {/* Lọc Vị trí */}
