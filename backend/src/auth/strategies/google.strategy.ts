@@ -14,12 +14,13 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   }
 
   async validate(accessToken: string, refreshToken: string, profile: any, done: VerifyCallback): Promise<any> {
-    const { name, emails, photos } = profile;
+    const { name, emails, photos, id } = profile; // 🆕 Thêm id
     const user = {
       email: emails[0].value,
       firstName: name.givenName,
       lastName: name.familyName,
-      picture: photos[0].value,
+      avatar_url: photos[0]?.value || '', // 🆕 Thêm ? để an toàn
+      provider_id: id, // 🆕 Lưu provider_id từ Google
       accessToken,
     };
     done(null, user);

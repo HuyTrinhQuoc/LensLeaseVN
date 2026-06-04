@@ -32,6 +32,12 @@ import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
 import DashboardMyListingsPage from '../pages/Dashboard/DashboardMyListingsPage';
 import DashboardStatsPage from '../pages/Dashboard/DashboardStatsPage';
 import HandoverForm from '../components/layout/HandoverForm';
+import VerifyEmail from '../components/layout/VerifyEmail';
+import AdminLayout from '../components/AdminLayout/AdminLayout';
+import AdminDashboard from '../pages/AdminDashboard/AdminDashboard';
+import AdminUserManagement from '../pages/AdminUserManagement/AdminUserManagement';
+import AdminListingsManagement from '../pages/AdminListingsManagement/AdminListingsManagement';
+import AdminFinance from '../pages/AdminFinanceDashboard/AdminFinance';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -84,9 +90,21 @@ export default function AppRoutes() {
         <Route path="new-listing" element={<NewListingPage />} />
 
         {/* Reuse existing NewListingPage nếu có */}
-        
+
       </Route>
-      
+
+
+<Route path="/admin" element={<AdminLayout />}>
+
+  <Route index element={<AdminDashboard />} /> 
+  <Route path="dashboard" element={<AdminDashboard />} />
+
+  <Route path="users" element={<AdminUserManagement />} /> 
+  
+  <Route path="listings" element={<AdminListingsManagement />} /> 
+  
+  <Route path="finance" element={<AdminFinance />} />  
+</Route>
 
       {/* ══════════════════════════════════════════════
           LEGACY LENDER ROUTES (redirect to new dashboard)
@@ -100,6 +118,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login-success" element={<LoginSuccess />} />
+      <Route path="/verify" element={<VerifyEmail />} />
     </Routes>
   );
 }

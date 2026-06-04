@@ -12,7 +12,6 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // States quản lý UI
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -25,7 +24,8 @@ const Auth = () => {
       const res = await api.post('/auth/login', { email, password });
       
       const token = res.data.accessToken;
-      // Lưu token vào localStorage
+      const user = res.data.user; // Lấy thông tin user từ response
+      
       localStorage.setItem('token', token);
       
       // ✅ Set Supabase JWT for Realtime authentication
@@ -35,20 +35,20 @@ const Auth = () => {
       try {
         const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
         if (localCart.length > 0) {
-          // Pass token implicitly via api interceptor or just assume it is set by Auth service.
-          // Since we just set token in localStorage, api interceptor should pick it up.
-          // Wait, api interceptor reads from getAuthToken() which reads from localStorage.
-          // So we can just call cartService.mergeCart
           await cartService.mergeCart(localCart);
-          // Xóa giỏ hàng local sau khi đã gộp thành công
           localStorage.removeItem('cart');
         }
       } catch (mergeError) {
         console.error('Lỗi khi merge giỏ hàng:', mergeError);
       }
 
-      // Đăng nhập thành công
-      navigate(fromCart ? '/cart' : '/');
+      // KIỂM TRA ROLE VÀ CHUYỂN HƯỚNG
+      if (user.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate(fromCart ? '/cart' : '/');
+      }
+      
     } catch (error: any) {
       setErrorMsg(error.response?.data?.message || 'Sai thông tin đăng nhập');
     } finally {
@@ -59,6 +59,7 @@ const Auth = () => {
   const handleGoogleLogin = () => {
     window.location.href = `${API_BASE_URL}/auth/google`;
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-surface-container-low font-body">

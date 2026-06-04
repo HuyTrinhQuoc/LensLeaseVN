@@ -12,6 +12,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { AdminUserModule } from './admin-user/admin-user.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ChatModule } from './modules/chat/chat.module';
     WalletModule,
     PaymentsModule,
     ChatModule,
+    AdminUserModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, MailService],

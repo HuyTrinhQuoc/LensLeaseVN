@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma.service';
 import { MailService } from '../mail/mail.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtGuard } from './strategies/jwt.guard';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
@@ -15,7 +16,15 @@ import { JwtGuard } from './strategies/jwt.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, MailService, GoogleStrategy, JwtGuard],
+  // Gộp tất cả vào một mảng duy nhất
+  providers: [
+    AuthService, 
+    PrismaService, 
+    MailService, 
+    GoogleStrategy, 
+    JwtGuard,   
+    JwtStrategy     
+  ],
   exports: [JwtGuard],
 })
 export class AuthModule {}
