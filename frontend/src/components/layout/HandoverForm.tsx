@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { handoverService } from '../../services/handover.service';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface HandoverFormProps {
   bookingData: any;
@@ -84,6 +85,7 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
 
   const handleSubmit = async () => {
     if (!agreed) return;
+    const loadingToast = toast.loading('Đang xử lý biên bản trên hệ thống...');
     try {
       setIsSubmitting(true);
 
@@ -93,7 +95,8 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
           images_checkout: imagesCheckout,
           is_damaged: isDamaged
         });
-        alert('Xác nhận trả máy thành công! Đơn hàng đã chuyển sang trạng thái COMPLETED.');
+        toast.dismiss(loadingToast);
+        toast.success('Xác nhận trả thiết bị thành công! Đơn hàng đã hoàn tất.');
       } else {
         await handoverService.processCheckIn(bookingId, {
           note_checkin: noteCheckin,
@@ -101,19 +104,24 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
           signature_a: "SIGNED_BY_OWNER_MOCK_DATA",
           signature_b: "SIGNED_BY_RENTER_MOCK_DATA"
         });
-        alert('Lập biên bản bàn giao thành công! Đơn hàng đã chuyển sang trạng thái ĐANG THUÊ (ACTIVE).');
+        toast.dismiss(loadingToast);
+        toast.success('Lập biên bản thành công! Thiết bị đã được bàn giao cho người thuê.');
       }
 
       if (onSuccess) onSuccess();
     } catch (error: any) {
+      toast.dismiss(loadingToast);
       console.error(error);
-      alert(error?.response?.data?.message || 'Có lỗi xảy ra khi xử lý biên bản');
+      const errorMsg = error?.response?.data?.message || 'Có lỗi xảy ra khi xử lý biên bản, vui lòng thử lại.';
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
+    <>
+    <Toaster position="top-center" reverseOrder={false} />
     <div className="max-w-4xl mx-auto my-8 bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/20 overflow-hidden">
       
       <div className={`${isCheckOutMode ? 'bg-error/5 border-error/10' : 'bg-primary/5 border-primary/10'} border-b p-8 flex justify-between items-center`}>
@@ -332,5 +340,6 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
       </div>
 
     </div>
+    </>
   );
 }
