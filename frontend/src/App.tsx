@@ -1,8 +1,11 @@
 import Sidebar from './components/layout/Sidebar';
 import HandoverForm from './components/layout/HandoverForm';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
+    <>
+    <Toaster position="top-right" reverseOrder={false} /> 
     <div className="bg-surface-container-low min-h-screen">
       <Sidebar />
       <main className="ml-64 pt-8 pb-12 px-12">
@@ -14,14 +17,11 @@ function App() {
               <p className="text-on-surface-variant font-medium">Quản lý các thiết bị kỹ thuật của bạn.</p>
             </div>
           </div>
-
-     
-
-
           <HandoverForm />
         </div>
       </main>
     </div>
+    </>
   );
 }
 
