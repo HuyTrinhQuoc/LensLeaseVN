@@ -7,7 +7,11 @@ import { PrismaService } from '../../prisma.service';
 import { CreateBookingDto, ExtendBookingDto, CheckoutGroupDto } from './dto';
 import { LensAvailabilityService } from '../lens-availability/lens-availability.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
-import { parseDateOnlyLocal, toDateOnlyString, isYmdBetweenInclusive } from '../../common/date-only.util';
+import {
+  parseDateOnlyLocal,
+  toDateOnlyString,
+  isYmdBetweenInclusive,
+} from '../../common/date-only.util';
 
 /** Tỉ lệ phí sàn: 8% */
 const PLATFORM_FEE_RATE = 0.08;
@@ -117,7 +121,9 @@ export class BookingsService {
         booked_qty: bookedQty,
         blocked_qty: blockedQty,
         ...(isBlocked && { blocked_reason: blockedReason }),
-        ...(bookingStatuses.length > 0 && { bookings_preview: bookingStatuses }),
+        ...(bookingStatuses.length > 0 && {
+          bookings_preview: bookingStatuses,
+        }),
       });
 
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
@@ -134,7 +140,12 @@ export class BookingsService {
   /**
    * Kiểm tra khả dụng cho khoảng ngày cụ thể.
    */
-  async checkAvailability(lensId: string, startDate: string, endDate: string, quantity: number) {
+  async checkAvailability(
+    lensId: string,
+    startDate: string,
+    endDate: string,
+    quantity: number,
+  ) {
     return this.lensAvailability.getAvailabilityPayload(
       lensId,
       startDate,
@@ -142,6 +153,22 @@ export class BookingsService {
       quantity,
       (a, b) => this.calculateRentalDays(a, b),
     );
+  }
+
+  async renterReturnDevice(id: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+    if (booking.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        'Trạng thái đơn hàng không hợp lệ để trả máy',
+      );
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { renter_returned: true },
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -152,16 +179,53 @@ export class BookingsService {
    * Tạo yêu cầu thuê (Bước 1: Người thuê gửi YÊU CẦU).
    * Status = PENDING, chờ Owner duyệt.
    */
+
+  // ═══════════════════════════════════════════
+  //  LẤY CHI TIẾT 1 ĐƠN ĐẶT THUÊ THEO ID
+  // ═══════════════════════════════════════════
+  async findOne(id: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        user: true, 
+        owner: true, 
+        handoverReport: true, 
+        items: {
+          include: {
+            lens: {
+              include: {
+                specs: true, 
+                images: true, 
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Không tìm thấy đơn đặt thuê với ID: ${id}`);
+    }
+
+    return booking;
+  }
+
   async createBooking(userId: string, dto: CreateBookingDto) {
     const lens = await this.prisma.lensListing.findUnique({
       where: { id: dto.lens_id },
     });
     if (!lens) throw new NotFoundException('Sản phẩm không tồn tại');
-    if (!lens.available || lens.is_deleted || lens.approval_status !== 'APPROVED') {
+    if (
+      !lens.available ||
+      lens.is_deleted ||
+      lens.approval_status !== 'APPROVED'
+    ) {
       throw new BadRequestException('Sản phẩm không khả dụng');
     }
     if (lens.owner_id === userId) {
-      throw new BadRequestException('Bạn không thể thuê thiết bị của chính mình');
+      throw new BadRequestException(
+        'Bạn không thể thuê thiết bị của chính mình',
+      );
     }
 
     const startDate = parseDateOnlyLocal(dto.start_date);
@@ -169,12 +233,15 @@ export class BookingsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (startDate < today) throw new BadRequestException('Ngày bắt đầu không thể trong quá khứ');
-    if (endDate <= startDate) throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
+    if (startDate < today)
+      throw new BadRequestException('Ngày bắt đầu không thể trong quá khứ');
+    if (endDate <= startDate)
+      throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
 
     // Kiểm tra khả dụng (booking + blocked dates), parse ngày local
     const booking = await this.prisma.$transaction(async (tx) => {
-      const quantity = dto.quantity != null && dto.quantity > 0 ? dto.quantity : 1;
+      const quantity =
+        dto.quantity != null && dto.quantity > 0 ? dto.quantity : 1;
 
       await this.lensAvailability.assertLensAvailable(
         tx,
@@ -249,7 +316,12 @@ export class BookingsService {
 
     return this.prisma.$transaction(async (tx) => {
       type Line = {
-        lens: { id: string; owner_id: string; price_per_day: unknown; required_deposit_amount: unknown | null };
+        lens: {
+          id: string;
+          owner_id: string;
+          price_per_day: unknown;
+          required_deposit_amount: unknown | null;
+        };
         startDate: Date;
         endDate: Date;
         subTotal: number;
@@ -265,12 +337,21 @@ export class BookingsService {
         const lens = await tx.lensListing.findUnique({
           where: { id: item.lens_id },
         });
-        if (!lens) throw new NotFoundException(`Sản phẩm ${item.lens_id} không tồn tại`);
-        if (!lens.available || lens.is_deleted || lens.approval_status !== 'APPROVED') {
-          throw new BadRequestException('Một hoặc nhiều sản phẩm không khả dụng');
+        if (!lens)
+          throw new NotFoundException(`Sản phẩm ${item.lens_id} không tồn tại`);
+        if (
+          !lens.available ||
+          lens.is_deleted ||
+          lens.approval_status !== 'APPROVED'
+        ) {
+          throw new BadRequestException(
+            'Một hoặc nhiều sản phẩm không khả dụng',
+          );
         }
         if (lens.owner_id === userId) {
-          throw new BadRequestException('Bạn không thể thuê thiết bị của chính mình');
+          throw new BadRequestException(
+            'Bạn không thể thuê thiết bị của chính mình',
+          );
         }
 
         const allowed = lens.allowed_deposit_types ?? [];
@@ -291,14 +372,22 @@ export class BookingsService {
           throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
         }
 
-        const quantity = item.quantity != null && item.quantity > 0 ? item.quantity : 1;
+        const quantity =
+          item.quantity != null && item.quantity > 0 ? item.quantity : 1;
 
-        await this.lensAvailability.assertLensAvailable(tx, item.lens_id, startDate, endDate, quantity);
+        await this.lensAvailability.assertLensAvailable(
+          tx,
+          item.lens_id,
+          startDate,
+          endDate,
+          quantity,
+        );
 
         const rentalDays = this.calculateRentalDays(startDate, endDate);
         const pricePerDay = Number(lens.price_per_day);
         const subTotal = pricePerDay * rentalDays * quantity;
-        const platformFee = Math.round(subTotal * PLATFORM_FEE_RATE * 100) / 100;
+        const platformFee =
+          Math.round(subTotal * PLATFORM_FEE_RATE * 100) / 100;
         const totalPrice = subTotal + platformFee;
         const depositAmount = lens.required_deposit_amount
           ? Number(lens.required_deposit_amount)
@@ -320,7 +409,10 @@ export class BookingsService {
       /** Tổng tiền khách phải có trên ví khi chủ duyệt: tiền thuê+phí + cọc nền tảng (nếu MONEY_PLATFORM). Khớp `chargeRenterOnConfirm`. */
       const groupPayableTotal = lines.reduce((s, l) => {
         const dep =
-          l.item.selected_deposit_type === 'MONEY_PLATFORM' && l.depositAmount > 0 ? l.depositAmount : 0;
+          l.item.selected_deposit_type === 'MONEY_PLATFORM' &&
+          l.depositAmount > 0
+            ? l.depositAmount
+            : 0;
         return s + l.totalPrice + dep;
       }, 0);
 
@@ -339,9 +431,19 @@ export class BookingsService {
       const bookings: Awaited<ReturnType<typeof tx.booking.create>>[] = [];
 
       for (const line of lines) {
-        const { lens, startDate, endDate, subTotal, platformFee, totalPrice, depositAmount, item } = line;
+        const {
+          lens,
+          startDate,
+          endDate,
+          subTotal,
+          platformFee,
+          totalPrice,
+          depositAmount,
+          item,
+        } = line;
         const pricePerDay = Number(lens.price_per_day);
-        const quantity = item.quantity != null && item.quantity > 0 ? item.quantity : 1;
+        const quantity =
+          item.quantity != null && item.quantity > 0 ? item.quantity : 1;
 
         const nb = await tx.booking.create({
           data: {
@@ -408,7 +510,13 @@ export class BookingsService {
   /**
    * Danh sách booking (lọc theo role + status).
    */
-  async findAll(userId: string, role: 'renter' | 'owner', status?: string, page = 1, limit = 10) {
+  async findAll(
+    userId: string,
+    role: 'renter' | 'owner',
+    status?: string,
+    page = 1,
+    limit = 10,
+  ) {
     const where: any = {};
 
     if (role === 'renter') {
@@ -431,8 +539,22 @@ export class BookingsService {
         take: limit,
         include: {
           items: { include: { lens: { include: { images: true } } } },
-          owner: { select: { id: true, full_name: true, phone: true, rating_avg: true } },
-          user: { select: { id: true, full_name: true, phone: true, rating_avg: true } },
+          owner: {
+            select: {
+              id: true,
+              full_name: true,
+              phone: true,
+              rating_avg: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              full_name: true,
+              phone: true,
+              rating_avg: true,
+            },
+          },
         },
       }),
       this.prisma.booking.count({ where }),
@@ -465,7 +587,10 @@ export class BookingsService {
       where: { owner_id: ownerId, status: 'COMPLETED' },
       select: { total_price: true },
     });
-    const totalRevenue = completedBookings.reduce((sum, b) => sum + Number(b.total_price), 0);
+    const totalRevenue = completedBookings.reduce(
+      (sum, b) => sum + Number(b.total_price),
+      0,
+    );
 
     const owner = await this.prisma.user.findUnique({
       where: { id: ownerId },
@@ -504,9 +629,27 @@ export class BookingsService {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        items: { include: { lens: { include: { images: true, specs: true } } } },
-        owner: { select: { id: true, full_name: true, phone: true, email: true, rating_avg: true } },
-        user: { select: { id: true, full_name: true, phone: true, email: true, rating_avg: true } },
+        items: {
+          include: { lens: { include: { images: true, specs: true } } },
+        },
+        owner: {
+          select: {
+            id: true,
+            full_name: true,
+            phone: true,
+            email: true,
+            rating_avg: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            phone: true,
+            email: true,
+            rating_avg: true,
+          },
+        },
         booking_group: true,
         disputes: true,
         reviews: true,
@@ -522,7 +665,10 @@ export class BookingsService {
     }
 
     // Thêm thông tin tính toán
-    const rentalDays = this.calculateRentalDays(booking.start_date, booking.end_date);
+    const rentalDays = this.calculateRentalDays(
+      booking.start_date,
+      booking.end_date,
+    );
     const lateFee = this.calculateLateFee(booking);
 
     return {
@@ -584,7 +730,11 @@ export class BookingsService {
    */
   async activateBooking(bookingId: string, ownerId: string) {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
-    this.assertStatus(booking, 'CONFIRMED', 'Chỉ có thể kích hoạt đơn đã xác nhận');
+    this.assertStatus(
+      booking,
+      'CONFIRMED',
+      'Chỉ có thể kích hoạt đơn đã xác nhận',
+    );
 
     return this.prisma.booking.update({
       where: { id: bookingId },
@@ -601,7 +751,9 @@ export class BookingsService {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
 
     if (booking.status !== 'ACTIVE' && booking.status !== 'OVERDUE') {
-      throw new BadRequestException('Chỉ có thể hoàn tất đơn đang hoạt động hoặc quá hạn');
+      throw new BadRequestException(
+        'Chỉ có thể hoàn tất đơn đang hoạt động hoặc quá hạn',
+      );
     }
 
     // Tính phí trả trễ nếu có
@@ -814,15 +966,25 @@ export class BookingsService {
   //  GIA HẠN
   // ═══════════════════════════════════════════
 
-  async requestExtension(bookingId: string, userId: string, dto: ExtendBookingDto) {
-    const booking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+  async requestExtension(
+    bookingId: string,
+    userId: string,
+    dto: ExtendBookingDto,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) throw new NotFoundException('Không tìm thấy đơn thuê');
-    if (booking.user_id !== userId) throw new BadRequestException('Chỉ người thuê mới có thể gia hạn');
-    if (booking.status !== 'ACTIVE') throw new BadRequestException('Chỉ gia hạn đơn đang hoạt động');
+    if (booking.user_id !== userId)
+      throw new BadRequestException('Chỉ người thuê mới có thể gia hạn');
+    if (booking.status !== 'ACTIVE')
+      throw new BadRequestException('Chỉ gia hạn đơn đang hoạt động');
 
     const newEnd = new Date(dto.requested_end_date);
     if (newEnd <= booking.end_date) {
-      throw new BadRequestException('Ngày gia hạn phải sau ngày kết thúc hiện tại');
+      throw new BadRequestException(
+        'Ngày gia hạn phải sau ngày kết thúc hiện tại',
+      );
     }
 
     return this.prisma.booking.update({
@@ -838,11 +1000,17 @@ export class BookingsService {
 
   async approveExtension(bookingId: string, ownerId: string) {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
-    if (!booking.is_extension_requested || booking.extension_status !== 'PENDING') {
+    if (
+      !booking.is_extension_requested ||
+      booking.extension_status !== 'PENDING'
+    ) {
       throw new BadRequestException('Không có yêu cầu gia hạn đang chờ');
     }
 
-    const extraDays = this.calculateRentalDays(booking.end_date, booking.requested_end_date!);
+    const extraDays = this.calculateRentalDays(
+      booking.end_date,
+      booking.requested_end_date!,
+    );
     const pricePerDay = Number(booking.items[0]?.price_per_day || 0);
     const extraCost = pricePerDay * extraDays;
     const extraFee = Math.round(extraCost * PLATFORM_FEE_RATE * 100) / 100;
@@ -923,7 +1091,10 @@ export class BookingsService {
 
   async rejectExtension(bookingId: string, ownerId: string) {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
-    if (!booking.is_extension_requested || booking.extension_status !== 'PENDING') {
+    if (
+      !booking.is_extension_requested ||
+      booking.extension_status !== 'PENDING'
+    ) {
       throw new BadRequestException('Không có yêu cầu gia hạn đang chờ');
     }
 
@@ -961,7 +1132,9 @@ export class BookingsService {
     ownerId: string,
   ): Promise<{ label: string; value: number }[]> {
     const keys = this.buildLast12MonthYmKeys();
-    const rows = await this.prisma.$queryRaw<{ ym: string; revenue: unknown }[]>`
+    const rows = await this.prisma.$queryRaw<
+      { ym: string; revenue: unknown }[]
+    >`
       SELECT to_char(date_trunc('month', b.updated_at), 'YYYY-MM') AS ym,
              COALESCE(SUM(b.total_price), 0)::float AS revenue
       FROM bookings b
@@ -978,15 +1151,12 @@ export class BookingsService {
       const m = ym.match(/^(\d{4})-(\d{2})$/);
       const y = m?.[1];
       const mo = m?.[2];
-      const label =
-        y && mo ? `${parseInt(mo, 10)}/${y}` : ym;
+      const label = y && mo ? `${parseInt(mo, 10)}/${y}` : ym;
       return { label, value: byYm.get(ym) ?? 0 };
     });
   }
 
-  private computeMomPercent(
-    series: { value: number }[],
-  ): number | null {
+  private computeMomPercent(series: { value: number }[]): number | null {
     if (!series?.length || series.length < 2) return null;
     const prev = series[series.length - 2]!.value;
     const last = series[series.length - 1]!.value;
@@ -1051,10 +1221,7 @@ export class BookingsService {
       );
       const lines = b.items.map((it) => ({
         lens_id: it.lens_id,
-        w:
-          Number(it.price_per_day) *
-          days *
-          Math.max(1, it.quantity ?? 1),
+        w: Number(it.price_per_day) * days * Math.max(1, it.quantity ?? 1),
       }));
       const sumW = lines.reduce((s, l) => s + l.w, 0);
       const total = Number(b.total_price);
@@ -1102,7 +1269,11 @@ export class BookingsService {
         brand: true,
         thumbnail: true,
         category: { select: { name: true } },
-        images: { take: 1, orderBy: { id: 'asc' }, select: { image_url: true } },
+        images: {
+          take: 1,
+          orderBy: { id: 'asc' },
+          select: { image_url: true },
+        },
       },
     });
     const byId = new Map(lenses.map((l) => [l.id, l]));
@@ -1136,10 +1307,14 @@ export class BookingsService {
     const now = new Date();
     if (now <= new Date(booking.end_date)) return 0;
 
-    const overdueDays = this.calculateRentalDays(new Date(booking.end_date), now);
+    const overdueDays = this.calculateRentalDays(
+      new Date(booking.end_date),
+      now,
+    );
     const pricePerDay = booking.items?.[0]
       ? Number(booking.items[0].price_per_day)
-      : Number(booking.sub_total) / this.calculateRentalDays(booking.start_date, booking.end_date);
+      : Number(booking.sub_total) /
+        this.calculateRentalDays(booking.start_date, booking.end_date);
 
     return Math.round(overdueDays * pricePerDay * 1.5 * 100) / 100; // 150% giá/ngày
   }
@@ -1151,7 +1326,9 @@ export class BookingsService {
     });
     if (!booking) throw new NotFoundException('Không tìm thấy đơn thuê');
     if (booking.owner_id !== ownerId) {
-      throw new BadRequestException('Bạn không phải chủ sản phẩm của đơn thuê này');
+      throw new BadRequestException(
+        'Bạn không phải chủ sản phẩm của đơn thuê này',
+      );
     }
     return booking;
   }
