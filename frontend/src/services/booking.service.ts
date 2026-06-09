@@ -1,3 +1,4 @@
+import axios from 'axios';
 import api from './api';
 
 export type BookingRole = 'renter' | 'owner';
@@ -91,5 +92,10 @@ export const bookingService = {
 
   getOwnerStats() {
     return api.get('/bookings/owner/stats');
+  },
+
+  // kiểm tra quá hạn và trả máy
+  renterReturn(id: string) {
+    return api.patch(`/bookings/${id}/renter-return`);
   },
 };
