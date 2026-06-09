@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import '../../styles/shared-layout.css';
+import { getRoleFromToken } from '../../utils/auth';
 
 function Icon({ name, className = '' }: { name: string; className?: string }) {
   return (
@@ -276,21 +277,34 @@ export default function Header() {
                     }}
                   >
                     <Link 
-                      to="/dashboard" 
+                      to="/#" 
                       style={{ display: 'block', padding: '10px 16px', color: '#333', textDecoration: 'none', fontSize: '14px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       Hồ sơ của tôi
                     </Link>
-                    <Link 
-                      to="/dashboard/orders" 
-                      style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      Quản lý cho thuê
-                    </Link>
+
+                    {getRoleFromToken()?.toUpperCase() === 'OWNER' ? (
+                      <Link 
+                        to="/dashboard/orders" 
+                        style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        Quản lý cho thuê
+                      </Link>
+                    ) : (
+                      <Link 
+                        to="/history" 
+                        style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        Lịch sử thuê
+                      </Link>
+                    )}
+
                     <button 
                       onClick={handleLogout}
                       style={{ 

@@ -65,6 +65,7 @@ export default function AppRoutes() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/news" element={<NewsPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/handover" element={<HandoverForm />} />
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/success" element={<BookingSuccessPage />} />
         <Route path="/bookings/payment-result" element={<BookingPaymentResultPage />} />

@@ -10,6 +10,7 @@ import {
   UnauthorizedException,
   UsePipes,
   ValidationPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
@@ -228,5 +229,15 @@ export class BookingsController {
     const userId = this.getUserId(headers);
     const booking = await this.bookingsService.rejectExtension(id, userId);
     return { message: 'Đã từ chối gia hạn', data: booking };
+  }
+
+  @Patch(':id/renter-return')
+  async renterReturn(@Param('id') id: string) {
+    return this.bookingsService.renterReturnDevice(id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.bookingsService.findOne(id);
   }
 }
