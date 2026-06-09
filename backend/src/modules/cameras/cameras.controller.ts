@@ -1,6 +1,17 @@
-import { Controller, Get, Post, Body, Query, Param, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Param,
+  Headers,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CamerasService } from './cameras.service';
+import { CreateCameraDto } from './dto/create-camera.dto';
 
 @ApiTags('Products (Máy ảnh & Ống kính)')
 @Controller('lenses')
@@ -20,24 +31,38 @@ export class CamerasController {
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
   async getCameraById(@Param('id') id: string) {
-    const product = await this.camerasService.findById(id); 
+    const product = await this.camerasService.findById(id);
     return {
       message: 'Lấy chi tiết sản phẩm thành công!',
       data: product,
     };
   }
 
+  @Get('categories/all')
+  @ApiOperation({ summary: 'Lấy toàn bộ danh mục sản phẩm từ Database' })
+  async getCategories() {
+    const categories = await this.camerasService.getCategories();
+    return {
+      message: 'Lấy danh sách danh mục thành công!',
+      data: categories,
+    };
+  }
+
   @Post()
-  @ApiOperation({ 
-    summary: 'Đăng tin thiết bị cho thuê mới', 
-    description: 'Yêu cầu client truyền header x-user-id để xác định chủ sở hữu (owner_id)' 
+  @ApiOperation({
+    summary: 'Đăng tin thiết bị cho thuê mới',
+    description:
+      'Yêu cầu client truyền header x-user-id để xác định chủ sở hữu (owner_id)',
   })
   async createListing(
-    @Headers('x-user-id') userId: string, 
-    @Body() dto: any
+    @Headers('x-user-id') userId: string,
+    @Body() dto: CreateCameraDto,
   ) {
     if (!userId) {
-      throw new HttpException('Missing x-user-id header', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        'Missing x-user-id header',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     return await this.camerasService.createListing(dto, userId);

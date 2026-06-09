@@ -1,9 +1,27 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsArray } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsArray, IsObject } from 'class-validator';
+
+export class CreateCameraSpecDto {
+  @IsString()
+  @IsOptional()
+  focal_length?: string;
+
+  @IsString()
+  @IsOptional()
+  max_aperture?: string;
+
+  @IsString()
+  @IsOptional()
+  mount?: string;
+
+  @IsString()
+  @IsOptional()
+  sensor_format?: string;
+}
 
 export class CreateCameraDto {
   @IsString()
   @IsNotEmpty()
-  title: string;
+  name: string; 
 
   @IsString()
   @IsNotEmpty()
@@ -19,7 +37,11 @@ export class CreateCameraDto {
 
   @IsNumber()
   @IsNotEmpty()
-  required_deposit_amount: number;
+  deposit_value: number; 
+
+  @IsString()
+  @IsNotEmpty()
+  category_id: string;
 
   @IsString()
   @IsNotEmpty()
@@ -30,15 +52,15 @@ export class CreateCameraDto {
   district: string;
 
   @IsString()
-  @IsNotEmpty()
-  thumbnail: string;
-
-  @IsString()
-  @IsNotEmpty()
-  owner_id: string;
+  @IsOptional()
+  ward?: string;
 
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  images?: string[]; 
+  images?: string[];
+
+  @IsObject()
+  @IsOptional()
+  specs?: CreateCameraSpecDto;
 }
