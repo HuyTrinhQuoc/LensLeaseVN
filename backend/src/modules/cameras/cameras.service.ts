@@ -39,6 +39,7 @@ export class CamerasService {
       where.approval_status = 'APPROVED';
     }
 
+    if (brand) where.brand = { contains: brand, mode: 'insensitive' };
     if (category) where.category_id = category;
     if (city) where.city = city;
     if (district) where.district = district;
@@ -104,36 +105,72 @@ export class CamerasService {
     }
     return product;
   }
+  async createListing(createListingDto: CreateCameraDto, userId: string) {
+    try {
+      const { images, specs, ...listingData } = createListingDto;
 
-  // ==========================================
-  // LOGIC ĐĂNG TIN MỚI ĐƯỢC GỘP VÀO ĐÂY
-  // ==========================================
-  async createListing(createListingDto: any, userId: string) {
-    const { images, ...listingData } = createListingDto;
+      const mainThumbnail = images && images.length > 0 ? images[0] : null;
 
-    const dataToSave = {
-      title: listingData.name || 'Sản phẩm mới',
-      brand: listingData.brand || null,
-      description: listingData.description || null,
-      price_per_day: listingData.price_per_day || 0,
-      required_deposit_amount: listingData.deposit_value || 0,
-      category_id: listingData.category_id || null,
-      owner_id: userId,
-      available: true,
-      is_deleted: false,
-      approval_status: 'PENDING' as const,
-    };
+      const imageObjects =
+        images?.map((url: string) => ({ image_url: url })) || [];
 
-    const imageObjects =
-      images?.map((url: string) => ({ image_url: url })) || [];
+      return await this.prisma.lensListing.create({
+        data: {
+          owner_id: userId,
+          title: listingData.name || 'Sản phẩm mới',
+          brand: listingData.brand || null,
+          description: listingData.description || null,
+          category_id: listingData.category_id || null,
+          city: listingData.city || null,
+          district: listingData.district || null,
+          ward: listingData.ward || null,
+          thumbnail: mainThumbnail,
+          quantity: 1,
+          available: true,
+          is_deleted: false,
+          approval_status: 'PENDING',
 
-    return await this.prisma.lensListing.create({
-      data: {
-        ...dataToSave,
-        images: {
-          create: imageObjects,
+          price_per_day: new Prisma.Decimal(listingData.price_per_day || 0),
+          market_value: new Prisma.Decimal(listingData.deposit_value || 0),
+
+          images: {
+            create: imageObjects,
+          },
+
+          specs: {
+            create: {
+              focal_length: specs?.focal_length || 'N/A',
+              max_aperture: specs?.max_aperture || 'N/A',
+              mount: specs?.mount || 'N/A',
+              sensor_format: specs?.sensor_format || 'Full Frame',
+            },
+          },
         },
-      },
-    });
+        include: {
+          images: true,
+          specs: true,
+        },
+      });
+    } catch (error) {
+      console.error('Lỗi chi tiết tại hàm createListing Backend:', error);
+      throw new InternalServerErrorException(
+        error.message || 'Lỗi hệ thống khi chèn dữ liệu đăng tin!',
+      );
+    }
+  }
+
+  async getCategories() {
+    try {
+      return await this.prisma.category.findMany({
+        orderBy: {
+          name: 'asc',
+        },
+      });
+    } catch (error) {
+      console.error('Lỗi khi lấy danh mục:', error);
+      throw new InternalServerErrorException(
+        'Không thể lấy danh sách danh mục!',
+      );
+    }
   }
 }

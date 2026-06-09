@@ -11,6 +11,7 @@ import { CartModule } from './modules/cart/cart.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { AdminUserModule } from './admin-user/admin-user.module';
 
 @Module({
@@ -25,6 +26,7 @@ import { AdminUserModule } from './admin-user/admin-user.module';
     BookingsModule,
     WalletModule,
     PaymentsModule,
+    ChatModule,
     AdminUserModule,
   ],
   controllers: [AppController],

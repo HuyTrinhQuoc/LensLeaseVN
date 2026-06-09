@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cartService } from '../../services/cart.service';
 import api from '../../services/api';
 import { API_BASE_URL } from '../../config/api-base';
+import { setSupabaseJWT } from '../../lib/supabase';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -26,6 +27,9 @@ const Auth = () => {
       const user = res.data.user; // Lấy thông tin user từ response
       
       localStorage.setItem('token', token);
+      
+      // ✅ Set Supabase JWT for Realtime authentication
+      await setSupabaseJWT(token);
       
       // Gộp giỏ hàng (Merge Cart)
       try {

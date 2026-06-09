@@ -30,7 +30,7 @@ model User {
   created_at                 DateTime                  @default(now())
   kyc_status                 ApprovalStatus?
   updated_at                 DateTime                  @default(now()) @updatedAt
-  is_verified                Boolean?                  @default(false)
+  is_verified                Boolean                  @default(false)
   bank_detail                BankDetail?
   booking_groups             BookingGroup[]
   booking_payout_allocations BookingPayoutAllocation[]

@@ -3,7 +3,7 @@ interface ProductSpecsProps {
   specs?: any; 
 }
 
-export default function ProductSpecs({ brand, specs }: ProductSpecsProps) {
+export default function ProductSpecs({ brand, specs: _specs }: ProductSpecsProps) {
   return (
     <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
       <h3 className="text-xl font-bold text-gray-900 mb-6">Thông số kỹ thuật chi tiết</h3>
