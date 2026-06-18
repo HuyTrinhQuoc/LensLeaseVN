@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
+import HeaderSearchAutocomplete from './HeaderSearchAutocomplete';
 import '../../styles/shared-layout.css';
 import { getRoleFromToken } from '../../utils/auth';
 
@@ -15,9 +15,6 @@ function Icon({ name, className = '' }: { name: string; className?: string }) {
 
 export default function Header() {
   const { totalItems } = useCart();
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   
   // States quản lý User
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -105,51 +102,6 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Debounce search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (query.trim().length > 0) {
-        fetchSuggestions(query);
-      } else {
-        setSuggestions([]);
-        setShowDropdown(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [query]);
-
-  const fetchSuggestions = async (q: string) => {
-    try {
-      const response = await api.get(`/suggestions?q=${q}`);
-      const data = Array.isArray(response.data)
-        ? response.data.map((item: any) => item.title || item)
-        : [];
-      
-      setSuggestions(data);
-      if (data.length > 0) setShowDropdown(true);
-    } catch (err) {
-      console.error('Error fetching suggestions:', err);
-      setSuggestions([]);
-      setShowDropdown(false);
-    }
-  };
-
-  const handleSearch = (searchQuery: string = query) => {
-    if (searchQuery.trim().length === 0) return;
-    setShowDropdown(false);
-    navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setQuery(suggestion);
-    handleSearch(suggestion);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSearch();
-  };
-
   // Hàm xử lý Đăng xuất
   const handleLogout = () => {
     localStorage.clear(); // Xóa sạch để tránh sót token cũ
@@ -159,6 +111,9 @@ export default function Header() {
     setShowUserMenu(false);
     navigate('/');
   };
+
+  /** Trang hồ sơ thật — GET/PATCH /users/me */
+  const profilePath = '/profile';
 
   return (
     <header className="dark-header">
@@ -184,49 +139,7 @@ export default function Header() {
              <h1>LENSLEASE</h1>
           </Link>
 
-          {/* Search */}
-          <div className="dark-header__search" style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-            />
-            
-            {/* Suggestions Dropdown */}
-            {showDropdown && suggestions.length > 0 && (
-              <div
-                style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0,
-                  backgroundColor: 'white', border: '1px solid #e0e0e0',
-                  borderRadius: '4px', maxHeight: '300px', overflowY: 'auto',
-                  zIndex: 1000, marginTop: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                }}
-              >
-                {suggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    style={{
-                      padding: '10px 16px', cursor: 'pointer',
-                      borderBottom: index < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      color: '#333', fontSize: '14px', transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                  >
-                    {suggestion}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button className="dark-header__search-btn" onClick={() => handleSearch()}>
-              <Icon name="search" />
-            </button>
-          </div>
+          <HeaderSearchAutocomplete />
 
           {/* Actions */}
           <div className="dark-header__actions">
@@ -277,7 +190,8 @@ export default function Header() {
                     }}
                   >
                     <Link 
-                      to="/#" 
+                      to={profilePath}
+                      onClick={() => setShowUserMenu(false)}
                       style={{ display: 'block', padding: '10px 16px', color: '#333', textDecoration: 'none', fontSize: '14px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
@@ -287,21 +201,42 @@ export default function Header() {
 
                     {getRoleFromToken()?.toUpperCase() === 'OWNER' ? (
                       <Link 
-                        to="/dashboard/orders" 
+                        to="/dashboard/orders"
+                        onClick={() => setShowUserMenu(false)}
                         style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         Quản lý cho thuê
                       </Link>
+                    ) : getRoleFromToken()?.toUpperCase() !== 'ADMIN' ? (
+                      <>
+                        <Link 
+                          to="/profile/become-owner"
+                          onClick={() => setShowUserMenu(false)}
+                          style={{ display: 'block', padding: '10px 16px', color: '#059669', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#ecfdf5')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          Cho thuê thiết bị
+                        </Link>
+                        <Link 
+                          to="/history"
+                          onClick={() => setShowUserMenu(false)}
+                          style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          Lịch sử thuê
+                        </Link>
+                      </>
                     ) : (
                       <Link 
-                        to="/history" 
+                        to="/admin/dashboard"
+                        onClick={() => setShowUserMenu(false)}
                         style={{ display: 'block', padding: '10px 16px', color: '#1a3fc7', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
-                        Lịch sử thuê
+                        Trang Admin
                       </Link>
                     )}
 

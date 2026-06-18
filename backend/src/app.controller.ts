@@ -15,25 +15,48 @@ export class AppController {
   }
 
   @Get('suggestions')
-  async getSuggestions(@Query('q') q: string) {
-    if (!q || q.trim().length === 0) {
-      return [];
+  async getSuggestions(
+    @Query('q') q: string,
+    @Query('limit') limit?: string,
+  ) {
+    const keyword = q?.trim();
+    if (!keyword) {
+      return { data: [] };
     }
 
-    const suggestions = await this.prisma.lensListing.findMany({
+    const take = Math.min(Math.max(Number(limit) || 8, 1), 12);
+
+    const items = await this.prisma.lensListing.findMany({
       where: {
-        title: {
-          contains: q,
-          mode: 'insensitive',
-        },
+        is_deleted: false,
+        available: true,
+        approval_status: 'APPROVED',
+        OR: [
+          { title: { contains: keyword, mode: 'insensitive' } },
+          { brand: { contains: keyword, mode: 'insensitive' } },
+        ],
       },
       select: {
+        id: true,
         title: true,
+        brand: true,
+        thumbnail: true,
+        price_per_day: true,
+        category: { select: { name: true } },
       },
-      take: 5,
-      distinct: ['title'],
+      take,
+      orderBy: [{ review_count: 'desc' }, { created_at: 'desc' }],
     });
 
-    return suggestions.map((item) => item.title);
+    return {
+      data: items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        brand: item.brand,
+        thumbnail: item.thumbnail,
+        price_per_day: Number(item.price_per_day),
+        category_name: item.category?.name ?? null,
+      })),
+    };
   }
 }

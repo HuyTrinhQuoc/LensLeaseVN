@@ -71,6 +71,11 @@ const AdminLayout: React.FC = () => {
             <span className="material-symbols-outlined text-[24px]">group</span>
             Người dùng
           </NavLink>
+
+          <NavLink to="/admin/owner-applications" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">storefront</span>
+            Duyệt chủ cho thuê
+          </NavLink>
           
           <NavLink to="/admin/listings" className={getDesktopNavStyle}>
             <span className="material-symbols-outlined text-[24px]">camera</span>

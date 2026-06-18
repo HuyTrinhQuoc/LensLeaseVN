@@ -11,6 +11,7 @@ interface SidebarItem {
 
 const RENTER_MENU: SidebarItem[] = [
   { icon: "home", label: "Trang chủ", to: "/", end: true },
+  { icon: "person", label: "Hồ sơ của tôi", to: "/profile" },
   { icon: "shopping_cart", label: "Giỏ hàng", to: "/cart" },
   { icon: "receipt_long", label: "Đơn của tôi", to: "/history" },
   { icon: "chat", label: "Tin nhắn", to: "/chat" },

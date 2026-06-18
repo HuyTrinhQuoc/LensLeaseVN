@@ -72,6 +72,24 @@ export default function DashboardMyListingsPage() {
           <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
             Hãy đăng thiết bị đầu tiên để bắt đầu cho thuê và kiếm thu nhập.
           </p>
+          <Link
+            to="/dashboard/new-listing"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '12px 24px',
+              borderRadius: 8,
+              background: '#0b45b3',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: 'none',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_circle</span>
+            Đăng tin đầu tiên
+          </Link>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>

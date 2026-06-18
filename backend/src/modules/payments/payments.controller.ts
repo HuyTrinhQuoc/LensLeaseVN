@@ -30,10 +30,32 @@ export class PaymentsController {
   ) {
     const msg = r.message;
     if (r.bookingGroupId) {
-      const url = this.payments.buildBookingGroupPayResultRedirect(r.ok, r.bookingGroupId, msg);
+      const url = this.payments.buildBookingGroupPayResultRedirect(r.ok, r.bookingGroupId, 'vnpay', msg);
       return res.redirect(302, url);
     }
     const url = this.payments.buildWalletTopupResultRedirect(r.ok, 'vnpay', msg);
+    return res.redirect(302, url);
+  }
+
+  private redirectAfterMomoBookingGroup(
+    res: Response,
+    r: { ok: boolean; bookingGroupId?: string },
+    message?: string,
+  ) {
+    if (!r.bookingGroupId) {
+      const url = this.payments.buildWalletTopupResultRedirect(
+        !!r.ok,
+        'momo',
+        message || 'Thanh toán chưa hoàn tất',
+      );
+      return res.redirect(302, url);
+    }
+    const url = this.payments.buildBookingGroupPayResultRedirect(
+      !!r.ok,
+      r.bookingGroupId,
+      'momo',
+      message,
+    );
     return res.redirect(302, url);
   }
 
@@ -129,6 +151,36 @@ export class PaymentsController {
   ) {
     const r = await this.payments.handleVnpayIpnOrReturn(query);
     return this.redirectAfterVnpay(res, r);
+  }
+
+  @Post('booking-groups/:groupId/momo')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tạo link MoMo thanh toán trước cho BookingGroup (tiền vào ví + PAID nhóm)' })
+  async createBookingGroupMomo(
+    @Headers() headers: Record<string, string>,
+    @Param('groupId') groupId: string,
+  ) {
+    const userId = this.getUserId(headers);
+    const data = await this.payments.createBookingGroupMomoCheckout(userId, groupId);
+    return { message: 'Tạo link MoMo thành công', data };
+  }
+
+  @Post('booking-groups/momo/notify')
+  @ApiOperation({ summary: 'MoMo IPN — đặt nhóm' })
+  async bookingGroupMomoNotify(@Body() body: Record<string, unknown>, @Res() res: Response) {
+    const out = await this.payments.handleMomoNotify(body);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(200).send(JSON.stringify(out));
+  }
+
+  @Get('booking-groups/momo/return')
+  @ApiOperation({ summary: 'MoMo return — đặt nhóm' })
+  async bookingGroupMomoReturn(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Res() res: Response,
+  ) {
+    const r = await this.payments.handleMomoReturn(query);
+    return this.redirectAfterMomoBookingGroup(res, r, r.ok ? undefined : 'Thanh toán chưa hoàn tất');
   }
 
   @Get('wallet-topup/vnpay/ipn')

@@ -17,6 +17,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/wallet':      'Ví của tôi',
   '/dashboard/my-listings': 'Thiết bị của tôi',
   '/dashboard/stats':       'Thống kê',
+  '/profile':               'Hồ sơ của tôi',
 };
 
 export default function ProfileDashboardLayout() {

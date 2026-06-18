@@ -36,12 +36,6 @@ export const SupabaseService = {
 
     try {
 
-      console.log('====================================================');
-      console.log('FETCHING LENS LISTINGS');
-      console.log('====================================================');
-
-      console.log('Options:', options);
-
       // =====================================================
       // BASE QUERY
       // =====================================================
@@ -242,30 +236,6 @@ export const SupabaseService = {
       } = await query;
 
       // =====================================================
-      // DEBUG
-      // =====================================================
-
-      console.log('====================================================');
-      console.log('SUPABASE RESPONSE');
-      console.log('====================================================');
-
-      console.log('Count:', count);
-
-      console.log(
-        'Data length:',
-        data?.length
-      );
-
-      console.log(
-        'Data preview:',
-        JSON.stringify(
-          data?.slice(0, 2),
-          null,
-          2
-        )
-      );
-
-      // =====================================================
       // HANDLE ERROR
       // =====================================================
 
@@ -345,8 +315,6 @@ export const SupabaseService = {
   ): Promise<ProductItem> {
 
     try {
-
-      console.log('Fetching listing:', id);
 
       const {
         data,

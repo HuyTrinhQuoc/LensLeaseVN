@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { ProductItem } from "../../type/product.type";
 import { SupabaseService } from "../../services/supabase.service";
 import ProductCard from "../../components/layout/ProductCard";
@@ -14,6 +14,8 @@ interface PaginatedResponse {
 }
 
 export default function ProductsPage() {
+  const [searchParams] = useSearchParams();
+
   // ================= STATE CHO DỮ LIỆU =================
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -24,6 +26,12 @@ export default function ProductsPage() {
   const [totalItems, setTotalItems] = useState<number>(0);
   const [sort, setSort] = useState<string>("popular");
   const [search, setSearch] = useState<string>("");
+
+  useEffect(() => {
+    const q = searchParams.get('search') || '';
+    setSearch(q);
+    setPage(1);
+  }, [searchParams]);
 
   // ================= STATE CHO BỘ LỌC (SIDEBAR) =================
   // Sử dụng state tạm thời cho form, chỉ khi bấm "Áp dụng" mới fetch

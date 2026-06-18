@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/cart.css';
 import { getAuthToken } from '../../utils/auth';
@@ -17,6 +17,12 @@ import {
   type GuestCartStoredItem,
 } from '../../utils/guest-cart';
 import { useCart } from '../../context/CartContext';
+import { ekycService } from '../../services/ekyc.service';
+import { PromotionPicker } from '../../components/promotion/PromotionPicker';
+import {
+  type AppliedPromotion,
+  setStoredPromotionCode,
+} from '../../services/promotion.service';
 
 /* ────────────────────────────────────────────
    Types
@@ -130,6 +136,8 @@ export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromotion | null>(null);
+  const prevSelectionKeyRef = useRef('');
 
   // ── Fetch Cart from API ──
   const fetchCart = useCallback(async () => {
@@ -354,9 +362,29 @@ export default function CartPage() {
     0,
   );
   const totalDeposit = selectedItemsList.reduce((sum, i) => sum + i.deposit * i.quantity, 0);
-  const rentalPlusPlatform = subtotal + platformFeeTotal;
+  const discount = appliedPromo?.discount_amount ?? 0;
+  const rentalPlusPlatform = Math.max(0, subtotal + platformFeeTotal - discount);
   const totalWhenOwnersConfirm = rentalPlusPlatform + totalDeposit;
   const totalItems = selectedItemsList.length;
+  const selectionKey = selectedItemsList
+    .map((i) => `${i.id}:${i.rentalDays}:${i.quantity}`)
+    .sort()
+    .join('|');
+  const lensIds = useMemo(
+    () => selectedItemsList.map((i) => i.lensId),
+    [selectedItemsList],
+  );
+
+  useEffect(() => {
+    if (!prevSelectionKeyRef.current) {
+      prevSelectionKeyRef.current = selectionKey;
+      return;
+    }
+    if (prevSelectionKeyRef.current === selectionKey) return;
+    prevSelectionKeyRef.current = selectionKey;
+    setAppliedPromo(null);
+    setStoredPromotionCode(null);
+  }, [selectionKey]);
 
   if (loading) {
     return (
@@ -609,7 +637,27 @@ export default function CartPage() {
                     </span>
                     <span>{formatCurrency(platformFeeTotal)}</span>
                   </div>
+                  {discount > 0 && appliedPromo && (
+                    <div className="cart-summary-card__row cart-summary-card__row--discount">
+                      <span>
+                        <Icon name="sell" />
+                        Giảm giá ({appliedPromo.code})
+                      </span>
+                      <span>−{formatCurrency(discount)}</span>
+                    </div>
+                  )}
                 </div>
+
+                <div className="cart-summary-card__divider" />
+
+                <PromotionPicker
+                  subtotal={subtotal}
+                  lensIds={lensIds}
+                  appliedPromo={appliedPromo}
+                  onChange={setAppliedPromo}
+                  disabled={selectedItemsList.length === 0}
+                  variant="cart"
+                />
 
                 <div className="cart-summary-card__divider" />
 
@@ -647,7 +695,19 @@ export default function CartPage() {
                       navigate('/login', { state: { cartReturn: true } });
                       return;
                     }
-                    navigate('/checkout', { state: { selectedItems: selectedItemsList } });
+                    const state = { selectedItems: selectedItemsList };
+                    void (async () => {
+                      try {
+                        const res = await ekycService.getStatus();
+                        if (res.data?.is_verified) {
+                          navigate('/checkout', { state });
+                        } else {
+                          navigate('/Verification', { state });
+                        }
+                      } catch {
+                        navigate('/Verification', { state });
+                      }
+                    })();
                   }}
                 >
                   <Icon name="shopping_cart_checkout" />

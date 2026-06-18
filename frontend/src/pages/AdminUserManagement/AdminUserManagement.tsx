@@ -9,6 +9,7 @@ export const translateRole = (role?: string) => {
   switch (role) {
     case 'ADMIN': return 'Quản trị viên';
     case 'USER': return 'Người dùng';
+    case 'OWNER': return 'Chủ cho thuê';
     case 'LENDER': return 'Chủ thiết bị';
     default: return role || 'Chưa rõ';
   }

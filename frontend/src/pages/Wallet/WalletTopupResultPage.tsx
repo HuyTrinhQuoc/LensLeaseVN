@@ -49,13 +49,27 @@ export default function WalletTopupResultPage() {
               <p className="mb-8 text-sm leading-relaxed text-slate-500">
                 {ok
                   ? 'Số dư ví đã được cập nhật (hoặc đang xử lý trong vài giây). Bạn có thể mở trang Ví và bấm làm mới để xem số dư mới nhất.'
-                  : 'Bạn có thể thử nạp lại từ trang Ví. Nếu tiền đã bị trừ mà ví chưa tăng, vui lòng giữ biên lai và liên hệ hỗ trợ kèm mã giao dịch.'}
+                  : 'Bạn có thể thử nạp lại từ trang Ví (VNPay hoặc MoMo). Nếu tiền đã bị trừ mà ví chưa tăng, vui lòng giữ biên lai và liên hệ hỗ trợ kèm mã giao dịch.'}
               </p>
             )}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              {!ok && (
+                <Link
+                  to="/wallet"
+                  state={{ openTopup: true }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1a3fc7] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800"
+                >
+                  <span className="material-symbols-outlined text-[20px]">payments</span>
+                  Thử nạp lại
+                </Link>
+              )}
               <Link
                 to="/wallet"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1a3fc7] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800"
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold shadow-sm transition ${
+                  ok
+                    ? 'bg-[#1a3fc7] text-white hover:bg-blue-800'
+                    : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+                }`}
               >
                 <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
                 Về Ví

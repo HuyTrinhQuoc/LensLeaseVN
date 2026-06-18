@@ -239,12 +239,10 @@ export default function ChatPage() {
 
     // Nếu đang subscribed conversation khác, hủy cái cũ trước
     if (unsubscribeMessagesRef.current) {
-      console.log(`🛑 Unsubscribing from old conv: ${currentSubscribedConvIdRef.current}`);
       unsubscribeMessagesRef.current();
       unsubscribeMessagesRef.current = null;
     }
 
-    console.log(` Subscribing to new conv: ${targetConvId}`);
     currentSubscribedConvIdRef.current = targetConvId;
 
     // Load lịch sử tin nhắn
@@ -265,8 +263,6 @@ export default function ChatPage() {
     const cleanup = ChatService.subscribeToMessages(
       targetConvId,
       (newMessage) => {
-        console.log(' Realtime message received:', newMessage.content);
-        
         setMessages((prev) => {
           const exists = prev.some((m) => m.id === newMessage.id);
           if (exists) return prev;

@@ -84,9 +84,12 @@ export class BookingsController {
 
   @Post()
   @ApiOperation({
-    summary: 'Tạo yêu cầu thuê (Bước 1)',
-    description: 'Người thuê gửi yêu cầu. Đơn sẽ ở trạng thái PENDING, chờ Owner duyệt.',
+    summary: 'Tạo yêu cầu thuê đơn lẻ (API trực tiếp)',
+    description:
+      'Người thuê gửi yêu cầu một thiết bị (PENDING, chờ Owner duyệt). Yêu cầu eKYC đã duyệt. ' +
+      'Luồng giao diện «Đặt ngay» trên web dùng checkout-group với một dòng (không qua giỏ).',
   })
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async create(
     @Headers() headers: Record<string, string>,
     @Body() dto: CreateBookingDto,
@@ -121,25 +124,52 @@ export class BookingsController {
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'from_date', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'to_date', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({
+    name: 'date_field',
+    required: false,
+    enum: ['start', 'end', 'overlap'],
+    description: 'start = ngày nhận, end = ngày trả, overlap = giao với khoảng',
+  })
+  @ApiQuery({ name: 'search', required: false, description: 'Mã đơn, tên khách, tên thiết bị' })
   async findAll(
     @Headers() headers: Record<string, string>,
     @Query('role') role: 'renter' | 'owner',
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('from_date') from_date?: string,
+    @Query('to_date') to_date?: string,
+    @Query('date_field') date_field?: 'start' | 'end' | 'overlap',
+    @Query('search') search?: string,
   ) {
     const userId = this.getUserId(headers);
     const result = await this.bookingsService.findAll(
-      userId, role || 'renter', status, Number(page) || 1, Number(limit) || 10,
+      userId,
+      role || 'renter',
+      status,
+      Number(page) || 1,
+      Number(limit) || 10,
+      { from_date, to_date, date_field, search },
     );
     return { message: 'Lấy danh sách đơn thuê thành công', ...result };
   }
 
   @Get('owner/stats')
   @ApiOperation({ summary: 'Thống kê cho chủ máy (Lender Dashboard)' })
-  async getOwnerStats(@Headers() headers: Record<string, string>) {
+  @ApiQuery({ name: 'month', required: false, description: '1-12' })
+  @ApiQuery({ name: 'year', required: false })
+  async getOwnerStats(
+    @Headers() headers: Record<string, string>,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
     const userId = this.getUserId(headers);
-    const stats = await this.bookingsService.getOwnerStats(userId);
+    const stats = await this.bookingsService.getOwnerStats(userId, {
+      month: month ? Number(month) : undefined,
+      year: year ? Number(year) : undefined,
+    });
     return { message: 'Lấy thống kê thành công', data: stats };
   }
 

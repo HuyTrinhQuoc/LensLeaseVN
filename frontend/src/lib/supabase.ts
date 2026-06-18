@@ -20,7 +20,6 @@ export async function setSupabaseJWT(jwtToken: string) {
       return false;
     }
 
-    console.log('Supabase JWT session set successfully');
     return true;
   } catch (err) {
     console.error('Failed to set Supabase JWT:', err);
