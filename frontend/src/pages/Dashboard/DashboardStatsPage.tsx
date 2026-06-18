@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bookingService } from '../../services/booking.service';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -6,27 +6,42 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
  * DashboardStatsPage — Trang "Thống kê" cho Chủ thiết bị
  */
 export default function DashboardStatsPage() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    bookingService.getOwnerStats()
-      .then(res => {
-        setStats(res.data.data);
-      })
-      .catch(err => {
-        console.error('Error loading stats:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+  const yearOptions = useMemo(() => {
+    const ys: number[] = [];
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 4; y -= 1) ys.push(y);
+    return ys;
   }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await bookingService.getOwnerStats({ month, year });
+      setStats(res.data.data);
+    } catch (err) {
+      console.error('Error loading stats:', err);
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [month, year]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function formatPrice(n: number) {
     return new Intl.NumberFormat('vi-VN').format(n) + ' đ';
   }
 
-  const COLORS = ['#1a3fc7', '#fcd34d', '#e2e8f0']; // Xanh, Vàng, Xám nhạt
+  const COLORS = ['#1a3fc7', '#fcd34d', '#e2e8f0'];
+
+  const periodLabel = stats?.period?.label ?? `Tháng ${month}, ${year}`;
 
   if (loading) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Đang tải dữ liệu...</div>;
@@ -48,22 +63,35 @@ export default function DashboardStatsPage() {
     <div style={{ background: '#f8fafc', minHeight: '100%', padding: '0 0 40px 0' }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Kỳ báo cáo hiện tại</div>
+          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Kỳ báo cáo</div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            Tháng {new Date().getMonth() + 1}, {new Date().getFullYear()}
+            {periodLabel}
           </h1>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>calendar_month</span>
-            Chọn thời gian
-          </button>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#1a3fc7', cursor: 'pointer' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
-            Xuất báo cáo
-          </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 12px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#64748b' }}>calendar_month</span>
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              style={{ border: 'none', fontSize: 13, fontWeight: 600, color: '#334155', background: 'transparent', outline: 'none', cursor: 'pointer' }}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>Tháng {m}</option>
+              ))}
+            </select>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              style={{ border: 'none', fontSize: 13, fontWeight: 600, color: '#334155', background: 'transparent', outline: 'none', cursor: 'pointer' }}
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -98,7 +126,7 @@ export default function DashboardStatsPage() {
               </div>
             )}
           </div>
-          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Tổng doanh thu</div>
+          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Doanh thu kỳ báo cáo</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{formatPrice(stats.total_revenue)}</div>
         </div>
 
@@ -109,7 +137,7 @@ export default function DashboardStatsPage() {
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>handshake</span>
             </div>
           </div>
-          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Lượt thuê thành công</div>
+          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>Lượt thuê hoàn tất (kỳ)</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{stats.successful_rentals}</div>
         </div>
 

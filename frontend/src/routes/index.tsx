@@ -26,6 +26,10 @@ import BookingHistoryPage from '../pages/History/HistoryPage';
 import BookingDetailPage from '../pages/BookingDetail/BookingDetailPage';
 import ChatPage from '../pages/Chat/ChatPage';
 import NewListingPage from '../pages/Owner/NewListingPage';
+import ProfileHubLayout from '../components/profile/ProfileHubLayout';
+import ProfileOverviewPage from '../pages/Profile/ProfileOverviewPage';
+import ProfileAccountPage from '../pages/Profile/ProfileAccountPage';
+import BecomeOwnerPage from '../pages/Profile/BecomeOwnerPage';
 
 // Pages — Dashboard (Profile / Lender)
 import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
@@ -38,6 +42,7 @@ import AdminDashboard from '../pages/AdminDashboard/AdminDashboard';
 import AdminUserManagement from '../pages/AdminUserManagement/AdminUserManagement';
 import AdminListingsManagement from '../pages/AdminListingsManagement/AdminListingsManagement';
 import AdminFinance from '../pages/AdminFinanceDashboard/AdminFinance';
+import AdminOwnerApplicationsPage from '../pages/AdminOwnerApplications/AdminOwnerApplicationsPage';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -72,6 +77,12 @@ export default function AppRoutes() {
         <Route path="/history" element={<BookingHistoryPage />} />
         <Route path="/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/profile" element={<ProfileHubLayout />}>
+          <Route index element={<ProfileOverviewPage />} />
+          <Route path="account" element={<ProfileAccountPage />} />
+          <Route path="become-owner" element={<BecomeOwnerPage />} />
+        </Route>
+        <Route path="/become-owner" element={<Navigate to="/profile/become-owner" replace />} />
       </Route>
 
       {/* ══════════════════════════════════════════════
@@ -103,6 +114,8 @@ export default function AppRoutes() {
   <Route path="users" element={<AdminUserManagement />} /> 
   
   <Route path="listings" element={<AdminListingsManagement />} /> 
+
+  <Route path="owner-applications" element={<AdminOwnerApplicationsPage />} />
   
   <Route path="finance" element={<AdminFinance />} />  
 </Route>

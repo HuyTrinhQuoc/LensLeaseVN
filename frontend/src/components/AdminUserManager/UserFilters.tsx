@@ -27,6 +27,7 @@ export const UserFilters: React.FC<Props> = ({ searchTerm, setSearchTerm, roleFi
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="px-4 py-3 bg-surface rounded-xl text-base focus:border-primary outline-none cursor-pointer shadow-sm">
           <option value="">Tất cả vai trò</option>
           <option value="USER">Người thuê</option>
+          <option value="OWNER">Chủ cho thuê</option>
           <option value="ADMIN">Quản trị viên</option>
         </select>
         <select value={kycFilter} onChange={e => setKycFilter(e.target.value)} className="px-4 py-3 bg-surface rounded-xl text-base focus:border-primary outline-none cursor-pointer shadow-sm">

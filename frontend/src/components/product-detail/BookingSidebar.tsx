@@ -11,6 +11,10 @@ import {
   calendarMonthFromYmd,
 } from "../../utils/date-only";
 import { BOOKING_SCHEDULE_UI, STALE_CALENDAR_PHRASE } from "../scheduling/booking-schedule-labels";
+import {
+  buildInstantCheckoutItem,
+  navigateToInstantCheckout,
+} from "../../utils/instant-checkout";
 
 /** Snapshot hiển thị giỏ khách / merge sau đăng nhập (không bắt buộc khi đã login + chỉ gọi API). */
 export type BookingLensCartMeta = {
@@ -238,40 +242,36 @@ export default function BookingSidebar({
     }
   };
 
-  const handleAddToCart = async () => {
+  const runBookingPreChecks = useCallback(async (): Promise<{ sy: string; ey: string } | null> => {
     const sy = startDate.split("T")[0];
     const ey = endDate.split("T")[0];
     const todayStrCheck = todayVietnamYmd();
 
     if (!sy || !ey) {
       setError(BOOKING_SCHEDULE_UI.errPickDates);
-      return;
+      return null;
     }
     if (sy > ey) {
       setError(BOOKING_SCHEDULE_UI.errEndBeforeStart);
-      return;
+      return null;
     }
     if (ey <= sy) {
       setError(BOOKING_SCHEDULE_UI.errEndMustBeAfterStart);
-      return;
+      return null;
     }
     if (sy < todayStrCheck) {
       setError(BOOKING_SCHEDULE_UI.errStartPast);
-      return;
+      return null;
     }
     if (calendarRangeConflict?.kind === "no_slot") {
       setError(BOOKING_SCHEDULE_UI.noSlotFromCalendar(calendarRangeConflict.days.join(", ")));
-      return;
+      return null;
     }
+
     try {
       setLoading(true);
       setError("");
       await loadCalendar();
-      /**
-       * Không dùng `fetchAvailability()` ở đây: nó gắn AbortController chung với
-       * `silentRecheckAvailability` (sau khi `calendar` cập nhật). Hai luồng abort lẫn nhau
-       * → Axios "canceled" hiện lên UI. Gọi API trực tiếp, không signal.
-       */
       const availRes = await bookingService.checkAvailability(lensId, {
         start_date: sy,
         end_date: ey,
@@ -283,16 +283,39 @@ export default function BookingSidebar({
       };
       setAvailability(avail);
       if (avail && avail.is_available === false) {
-        setLoading(false);
         setError(BOOKING_SCHEDULE_UI.notEnoughSlots(avail.available_quantity ?? 0));
-        return;
+        return null;
       }
+      return { sy, ey };
+    } catch (err: unknown) {
+      if (isRequestAbortError(err)) {
+        setError("");
+        return null;
+      }
+      const ax = err as { response?: { data?: { message?: string } } };
+      setError(
+        ax.response?.data?.message ||
+          (err instanceof Error ? err.message : BOOKING_SCHEDULE_UI.errCheckFailed),
+      );
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, calendarRangeConflict, loadCalendar, lensId]);
 
-      const depAmt =
-        marketValue != null && Number.isFinite(marketValue)
-          ? Math.round(marketValue * 0.5)
-          : Number(depositAmount) || 0;
+  const handleAddToCart = async () => {
+    const dates = await runBookingPreChecks();
+    if (!dates) return;
+    const { sy, ey } = dates;
 
+    const depAmt =
+      marketValue != null && Number.isFinite(marketValue)
+        ? Math.round(marketValue * 0.5)
+        : Number(depositAmount) || 0;
+
+    try {
+      setLoading(true);
+      setError("");
       await addToCartContext({
         lens_id: lensId,
         quantity: 1,
@@ -321,6 +344,32 @@ export default function BookingSidebar({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBookNow = async () => {
+    const dates = await runBookingPreChecks();
+    if (!dates) return;
+    const { sy, ey } = dates;
+
+    const depAmt =
+      marketValue != null && Number.isFinite(marketValue)
+        ? Math.round(marketValue * 0.5)
+        : Number(depositAmount) || 0;
+
+    const item = buildInstantCheckoutItem({
+      lensId,
+      title: lensMeta?.title || "Thiết bị",
+      imageUrl: lensMeta?.image_url,
+      ownerName: lensMeta?.owner_name,
+      ownerRating: lensMeta?.owner_rating,
+      startDate: sy,
+      endDate: ey,
+      pricePerDay,
+      deposit: lensMeta?.required_deposit_amount ?? depAmt,
+      allowedDepositTypes: lensMeta?.allowed_deposit_types,
+    });
+
+    await navigateToInstantCheckout(navigate, [item]);
   };
 
   const legend = (s: string) => {
@@ -527,12 +576,21 @@ export default function BookingSidebar({
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
+      <button
+        type="button"
+        onClick={() => void handleBookNow()}
+        disabled={loading || available === false}
+        className="mb-3 w-full rounded-xl bg-emerald-600 py-3.5 font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+      >
+        {loading ? BOOKING_SCHEDULE_UI.processing : BOOKING_SCHEDULE_UI.bookNow}
+      </button>
+
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
           type="button"
           onClick={() => void handleAddToCart()}
           disabled={loading || available === false}
-          className="rounded-xl bg-[#0b45b3] py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+          className="rounded-xl border-2 border-[#0b45b3] py-3.5 font-bold text-[#0b45b3] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
         >
           {loading ? BOOKING_SCHEDULE_UI.processing : BOOKING_SCHEDULE_UI.addToCart}
         </button>

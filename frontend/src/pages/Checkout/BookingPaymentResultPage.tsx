@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import BookingGroupVnpayButton from '../../components/wallet/BookingGroupVnpayButton';
 
 export default function BookingPaymentResultPage() {
   const [params] = useSearchParams();
   const ok = useMemo(() => params.get('ok') === '1', [params]);
   const groupId = params.get('groupId') || '';
+  const gateway = params.get('gateway') || 'vnpay';
+  const gatewayLabel = gateway === 'momo' ? 'MoMo' : 'VNPay';
   const msgRaw = params.get('msg') || '';
   const msg = useMemo(() => {
     if (!msgRaw) return '';
@@ -31,7 +34,7 @@ export default function BookingPaymentResultPage() {
               <span className="material-symbols-outlined text-[36px]">{ok ? 'check_circle' : 'error'}</span>
             </div>
             <h1 className="text-xl font-extrabold text-gray-900">
-              {ok ? 'Thanh toán VNPay thành công' : 'Thanh toán chưa hoàn tất'}
+              {ok ? `Thanh toán ${gatewayLabel} thành công` : 'Thanh toán chưa hoàn tất'}
             </h1>
             {groupId ? (
               <p className="mt-2 text-sm text-gray-600">
@@ -44,6 +47,11 @@ export default function BookingPaymentResultPage() {
                 : 'Bạn có thể thử lại từ trang kết quả đặt thuê (nếu còn mở) hoặc thanh toán sau qua trang Ví / lịch sử đơn.'}
             </p>
             {msg ? <p className="mt-3 text-xs text-gray-500 break-words">{msg}</p> : null}
+            {!ok && groupId ? (
+              <div className="mt-6 text-left">
+                <BookingGroupVnpayButton groupId={groupId} />
+              </div>
+            ) : null}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Link
                 to="/wallet"

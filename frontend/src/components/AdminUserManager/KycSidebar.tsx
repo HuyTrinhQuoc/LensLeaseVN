@@ -81,6 +81,12 @@ export const KycSidebar: React.FC<Props> = ({ user, onClose, onApprove, onReject
               <p className="text-sm font-mono text-outline bg-surface-container-high px-2 py-0.5 rounded w-fit truncate max-w-full">
                 {user.email}
               </p>
+              {user.cccd_number && (
+                <p className="text-sm text-on-surface-variant">
+                  Số CCCD:{' '}
+                  <span className="font-mono font-semibold text-on-surface">{user.cccd_number}</span>
+                </p>
+              )}
               <p className="text-sm text-on-surface-variant flex items-center gap-1.5 mt-1">
                 <span className="material-symbols-outlined text-[16px] text-outline">calendar_today</span>
                 Đăng ký: <span className="font-medium text-on-surface">{formatDate(user.created_at)}</span>
@@ -89,13 +95,13 @@ export const KycSidebar: React.FC<Props> = ({ user, onClose, onApprove, onReject
           </div>
         </div>
 
-        {/* View Ảnh CCCD */}
+        {/* View Ảnh CCCD (signed URL từ S3 — hết hạn sau ~10 phút) */}
         <div className="flex flex-col gap-7">
           <div className="flex flex-col gap-3">
             <h5 className="text-sm font-bold text-on-surface-variant uppercase tracking-wider">CCCD Mặt trước</h5>
             <div className="w-full aspect-[1.6/1] bg-surface-container-high rounded-2xl overflow-hidden relative shadow-sm border border-outline/10">
-               {user.cccd_front ? (
-                 <img src={user.cccd_front} alt="CCCD Front" className="w-full h-full object-cover" />
+               {user.cccd_front_url ? (
+                 <img src={user.cccd_front_url} alt="CCCD Front" className="w-full h-full object-cover" />
                ) : (
                  <div className="flex flex-col items-center justify-center h-full text-outline opacity-60">
                     <span className="material-symbols-outlined text-4xl mb-2">image_not_supported</span>
@@ -104,6 +110,24 @@ export const KycSidebar: React.FC<Props> = ({ user, onClose, onApprove, onReject
                )}
             </div>
           </div>
+          <div className="flex flex-col gap-3">
+            <h5 className="text-sm font-bold text-on-surface-variant uppercase tracking-wider">CCCD Mặt sau</h5>
+            <div className="w-full aspect-[1.6/1] bg-surface-container-high rounded-2xl overflow-hidden relative shadow-sm border border-outline/10">
+               {user.cccd_back_url ? (
+                 <img src={user.cccd_back_url} alt="CCCD Back" className="w-full h-full object-cover" />
+               ) : (
+                 <div className="flex flex-col items-center justify-center h-full text-outline opacity-60">
+                    <span className="material-symbols-outlined text-4xl mb-2">image_not_supported</span>
+                    <p className="text-sm font-medium">Chưa cập nhật ảnh</p>
+                 </div>
+               )}
+            </div>
+          </div>
+          {user.has_cccd_images && (
+            <p className="text-xs text-on-surface-variant">
+              Ảnh được tải qua liên kết bảo mật tạm thời (S3 private). Làm mới trang nếu ảnh hết hạn.
+            </p>
+          )}
         </div>
       </div>
 

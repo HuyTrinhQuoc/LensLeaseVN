@@ -51,7 +51,15 @@ export const ProductService = {
       console.warn('Supabase search failed, falling back to API:', error);
       // Fallback sang API backend
       const response = await api.get(`/suggestions?q=${encodeURIComponent(query)}`);
-      return response.data;
+      const body = response.data;
+      const list = Array.isArray(body) ? body : body?.data;
+      return (Array.isArray(list) ? list : []).map((item: { id?: string; title: string; brand?: string; thumbnail?: string; price_per_day?: number }) => ({
+        id: item.id || '',
+        title: item.title,
+        brand: item.brand,
+        thumbnail: item.thumbnail,
+        price_per_day: item.price_per_day,
+      }));
     }
   },
 };

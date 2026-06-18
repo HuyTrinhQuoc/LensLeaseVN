@@ -43,10 +43,15 @@ export class PaymentsService {
     return u.toString();
   }
 
-  /** Sau VNPay cho BookingGroup — tiền đã vào ví, đánh dấu nhóm PAID. */
-  buildBookingGroupPayResultRedirect(ok: boolean, groupId: string, message?: string): string {
+  /** Sau cổng thanh toán cho BookingGroup — tiền đã vào ví, đánh dấu nhóm PAID. */
+  buildBookingGroupPayResultRedirect(
+    ok: boolean,
+    groupId: string,
+    gateway: 'vnpay' | 'momo' = 'vnpay',
+    message?: string,
+  ): string {
     const u = new URL(`${this.appPublicUrl()}/bookings/payment-result`);
-    u.searchParams.set('gateway', 'vnpay');
+    u.searchParams.set('gateway', gateway);
     u.searchParams.set('ok', ok ? '1' : '0');
     u.searchParams.set('groupId', groupId);
     if (message) u.searchParams.set('msg', message.slice(0, 240));
@@ -315,21 +320,13 @@ export class PaymentsService {
     return Math.round(sum);
   }
 
-  async createBookingGroupVnpayCheckout(
+  /** Chuẩn bị giao dịch PENDING cho thanh toán trước nhóm đơn (VNPay / MoMo). */
+  private async prepareBookingGroupPrepay(
     userId: string,
     groupId: string,
-    clientIp?: string,
-    vnpayBankCode?: string,
-  ): Promise<{ paymentUrl: string; transactionId: string; amountVnd: number }> {
-    const tmn = this.config.get<string>('VNPAY_TMN_CODE')?.trim();
-    const secret = this.config.get<string>('VNPAY_HASH_SECRET')?.trim();
-    const payUrlBase =
-      this.config.get<string>('VNPAY_PAYMENT_URL')?.trim() ||
-      'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
-    if (!tmn || !secret) {
-      throw new BadRequestException('VNPay chưa được cấu hình (VNPAY_TMN_CODE, VNPAY_HASH_SECRET).');
-    }
-
+    paymentMethod: PaymentMethod,
+    pendingDescription: string,
+  ): Promise<{ amountVnd: number; pendingTxId: string }> {
     const group = await this.prisma.bookingGroup.findFirst({
       where: { id: groupId, user_id: userId },
       include: {
@@ -347,7 +344,7 @@ export class PaymentsService {
 
     const amountVnd = this.computeBookingGroupPrepayVnd(group.bookings);
     if (amountVnd < 10000) {
-      throw new BadRequestException('Số tiền thanh toán nhỏ hơn mức tối thiểu VNPay (10.000đ).');
+      throw new BadRequestException('Số tiền thanh toán nhỏ hơn mức tối thiểu (10.000đ).');
     }
 
     const dup = await this.prisma.transaction.findFirst({
@@ -360,7 +357,7 @@ export class PaymentsService {
     });
     if (dup) {
       throw new BadRequestException(
-        'Đã có giao dịch VNPay đang chờ cho nhóm này. Hoàn tất hoặc đợi hết hạn link cũ trước khi tạo mới.',
+        'Đã có giao dịch đang chờ cho nhóm này. Hoàn tất hoặc đợi hết hạn link cũ trước khi tạo mới.',
       );
     }
 
@@ -378,10 +375,35 @@ export class PaymentsService {
         amount: new Prisma.Decimal(amountVnd),
         type: 'DEPOSIT',
         status: 'PENDING',
-        payment_method: PaymentMethod.VNPAY,
-        description: `VNPay đặt nhóm thuê — chờ cổng (${groupId.slice(0, 8)})`,
+        payment_method: paymentMethod,
+        description: pendingDescription,
       },
     });
+
+    return { amountVnd, pendingTxId: pending.id };
+  }
+
+  async createBookingGroupVnpayCheckout(
+    userId: string,
+    groupId: string,
+    clientIp?: string,
+    vnpayBankCode?: string,
+  ): Promise<{ paymentUrl: string; transactionId: string; amountVnd: number }> {
+    const tmn = this.config.get<string>('VNPAY_TMN_CODE')?.trim();
+    const secret = this.config.get<string>('VNPAY_HASH_SECRET')?.trim();
+    const payUrlBase =
+      this.config.get<string>('VNPAY_PAYMENT_URL')?.trim() ||
+      'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+    if (!tmn || !secret) {
+      throw new BadRequestException('VNPay chưa được cấu hình (VNPAY_TMN_CODE, VNPAY_HASH_SECRET).');
+    }
+
+    const { amountVnd, pendingTxId } = await this.prepareBookingGroupPrepay(
+      userId,
+      groupId,
+      PaymentMethod.VNPAY,
+      `VNPay đặt nhóm thuê — chờ cổng (${groupId.slice(0, 8)})`,
+    );
 
     const base = this.apiPublicUrl();
     const returnUrl = `${base}/payments/booking-groups/vnpay/return`;
@@ -390,14 +412,116 @@ export class PaymentsService {
       tmnCode: tmn,
       secretKey: secret,
       returnUrl,
-      txnRef: pending.id,
+      txnRef: pendingTxId,
       orderInfo: `Dat nhom thue ${groupId.slice(0, 8)}`,
       amountVnd,
       clientIp: clientIp?.trim() || '127.0.0.1',
       bankCode: vnpayBankCode?.trim() || undefined,
     });
 
-    return { paymentUrl, transactionId: pending.id, amountVnd };
+    return { paymentUrl, transactionId: pendingTxId, amountVnd };
+  }
+
+  async createBookingGroupMomoCheckout(
+    userId: string,
+    groupId: string,
+  ): Promise<{ paymentUrl: string; transactionId: string; amountVnd: number }> {
+    const partner = this.config.get<string>('MOMO_PARTNER_CODE')?.trim();
+    const access = this.config.get<string>('MOMO_ACCESS_KEY')?.trim();
+    const secret = this.config.get<string>('MOMO_SECRET_KEY')?.trim();
+    const endpoint =
+      this.config.get<string>('MOMO_ENDPOINT')?.trim() ||
+      'https://test-payment.momo.vn/v2/gateway/api/create';
+    if (!partner || !access || !secret) {
+      throw new BadRequestException(
+        'MoMo chưa được cấu hình (MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET_KEY).',
+      );
+    }
+
+    const { amountVnd, pendingTxId } = await this.prepareBookingGroupPrepay(
+      userId,
+      groupId,
+      PaymentMethod.MOMO,
+      `MoMo đặt nhóm thuê — chờ cổng (${groupId.slice(0, 8)})`,
+    );
+
+    const base = this.apiPublicUrl();
+    const redirectUrl = `${base}/payments/booking-groups/momo/return`;
+    const ipnUrl = `${base}/payments/booking-groups/momo/notify`;
+    const requestId = `${Date.now()}-${pendingTxId.slice(0, 8)}`;
+    const orderIdMomo = pendingTxId.replace(/-/g, '').slice(0, 40);
+    const extraData = '';
+    const requestType = 'captureWallet';
+    const orderInfo = `Dat nhom thue ${groupId.slice(0, 8)}`;
+    const raw = momoRawSignatureCreate({
+      accessKey: access,
+      amount: String(amountVnd),
+      extraData,
+      ipnUrl,
+      orderId: orderIdMomo,
+      orderInfo,
+      partnerCode: partner,
+      redirectUrl,
+      requestId,
+      requestType,
+    });
+    const signature = momoCreateSignature(secret, raw);
+
+    const body = {
+      partnerCode: partner,
+      partnerName: 'LensLeaseVN',
+      storeId: 'LensLeaseStore',
+      requestId,
+      amount: amountVnd,
+      orderId: orderIdMomo,
+      orderInfo,
+      redirectUrl,
+      ipnUrl,
+      lang: 'vi',
+      requestType,
+      extraData,
+      signature,
+    };
+
+    let payUrl: string;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as {
+        resultCode?: number;
+        message?: string;
+        payUrl?: string;
+      };
+      if (json.resultCode !== 0 || !json.payUrl) {
+        this.log.warn(`MoMo booking group create failed: ${JSON.stringify(json)}`);
+        await this.prisma.transaction.update({
+          where: { id: pendingTxId },
+          data: {
+            status: 'FAILED',
+            description: `MoMo từ chối: ${json.message ?? json.resultCode}`,
+          },
+        });
+        throw new BadRequestException(json.message || 'MoMo không tạo được link thanh toán.');
+      }
+      payUrl = json.payUrl;
+      await this.prisma.transaction.update({
+        where: { id: pendingTxId },
+        data: { gateway_transaction_id: orderIdMomo },
+      });
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      this.log.error(`MoMo booking group fetch error: ${(e as Error).message}`);
+      await this.prisma.transaction.update({
+        where: { id: pendingTxId },
+        data: { status: 'FAILED', description: 'Lỗi gọi API MoMo' },
+      });
+      throw new InternalServerErrorException('Không kết nối được MoMo.');
+    }
+
+    return { paymentUrl: payUrl, transactionId: pendingTxId, amountVnd };
   }
 
   async handleVnpayIpnOrReturn(query: Record<string, string | string[] | undefined>) {
@@ -538,6 +662,10 @@ export class PaymentsService {
         this.log.warn(`MoMo return finalize: ${(e as Error).message}`);
       }
     }
-    return { ok: resultCode === 0, orderId: row?.id };
+    return {
+      ok: resultCode === 0,
+      orderId: row?.id,
+      bookingGroupId: row?.booking_group_id ?? undefined,
+    };
   }
 }

@@ -7,6 +7,8 @@ import { PrismaService } from '../../prisma.service';
 import { CreateBookingDto, ExtendBookingDto, CheckoutGroupDto } from './dto';
 import { LensAvailabilityService } from '../lens-availability/lens-availability.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
+import { PromotionsService } from '../promotions/promotions.service';
+import { EkycService } from '../ekyc/ekyc.service';
 import {
   parseDateOnlyLocal,
   toDateOnlyString,
@@ -22,6 +24,8 @@ export class BookingsService {
     private prisma: PrismaService,
     private readonly lensAvailability: LensAvailabilityService,
     private readonly walletLedger: WalletLedgerService,
+    private readonly promotionsService: PromotionsService,
+    private readonly ekycService: EkycService,
   ) {}
 
   // ═══════════════════════════════════════════
@@ -228,6 +232,8 @@ export class BookingsService {
       );
     }
 
+    await this.ekycService.assertUserKycApproved(userId);
+
     const startDate = parseDateOnlyLocal(dto.start_date);
     const endDate = parseDateOnlyLocal(dto.end_date);
     const today = new Date();
@@ -313,6 +319,8 @@ export class BookingsService {
     if (!dto.items?.length) {
       throw new BadRequestException('Danh sách đặt thuê không được để trống');
     }
+
+    await this.ekycService.assertUserKycApproved(userId);
 
     return this.prisma.$transaction(async (tx) => {
       type Line = {
@@ -416,21 +424,47 @@ export class BookingsService {
         return s + l.totalPrice + dep;
       }, 0);
 
+      let discountAmount = 0;
+      let promotionId: string | null = null;
+      if (dto.promotion_code?.trim()) {
+        const lensIds = lines.map((l) => l.lens.id);
+        const promo = await this.promotionsService.resolveDiscount(
+          dto.promotion_code,
+          groupSubTotal,
+          lensIds,
+          tx,
+        );
+        discountAmount = promo.discount_amount;
+        promotionId = promo.promotion_id;
+      }
+
+      const groupTotalAfterDiscount = Math.max(
+        0,
+        Math.round((groupPayableTotal - discountAmount) * 100) / 100,
+      );
+
       const group = await tx.bookingGroup.create({
         data: {
           user_id: userId,
           sub_total: groupSubTotal,
-          discount_amount: 0,
-          total_amount: groupPayableTotal,
+          discount_amount: discountAmount,
+          total_amount: groupTotalAfterDiscount,
           payment_method: 'CASH',
           status: 'PENDING',
           gateway_transaction_id: null,
+          promotion_id: promotionId,
         },
       });
 
-      const bookings: Awaited<ReturnType<typeof tx.booking.create>>[] = [];
+      if (promotionId) {
+        await this.promotionsService.incrementUsage(promotionId, tx);
+      }
 
-      for (const line of lines) {
+      const bookings: Awaited<ReturnType<typeof tx.booking.create>>[] = [];
+      let remainingDiscount = discountAmount;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         const {
           lens,
           startDate,
@@ -445,6 +479,19 @@ export class BookingsService {
         const quantity =
           item.quantity != null && item.quantity > 0 ? item.quantity : 1;
 
+        let lineDiscount = 0;
+        if (discountAmount > 0 && groupSubTotal > 0) {
+          if (i === lines.length - 1) {
+            lineDiscount = remainingDiscount;
+          } else {
+            lineDiscount =
+              Math.round((subTotal / groupSubTotal) * discountAmount * 100) /
+              100;
+            remainingDiscount -= lineDiscount;
+          }
+        }
+        const adjustedTotalPrice = Math.max(0, totalPrice - lineDiscount);
+
         const nb = await tx.booking.create({
           data: {
             user_id: userId,
@@ -453,8 +500,10 @@ export class BookingsService {
             start_date: startDate,
             end_date: endDate,
             sub_total: subTotal,
-            total_price: totalPrice,
+            total_price: adjustedTotalPrice,
             platform_fee_amount: platformFee,
+            discount_amount: lineDiscount,
+            promotion_id: promotionId,
             status: 'PENDING',
             delivery_method: item.delivery_method || 'SELF_PICKUP',
             delivery_address: item.delivery_address,
@@ -501,14 +550,15 @@ export class BookingsService {
       return {
         booking_group_id: group.id,
         booking_group_status: group.status,
-        total_amount: groupPayableTotal,
+        total_amount: groupTotalAfterDiscount,
+        discount_amount: discountAmount,
         bookings,
       };
     });
   }
 
   /**
-   * Danh sách booking (lọc theo role + status).
+   * Danh sách booking (lọc theo role + status + ngày + tìm kiếm).
    */
   async findAll(
     userId: string,
@@ -516,49 +566,77 @@ export class BookingsService {
     status?: string,
     page = 1,
     limit = 10,
+    opts?: {
+      from_date?: string;
+      to_date?: string;
+      date_field?: 'start' | 'end' | 'overlap';
+      search?: string;
+    },
   ) {
-    const where: any = {};
+    const baseWhere = this.buildBookingListWhere(userId, role, {
+      from_date: opts?.from_date,
+      to_date: opts?.to_date,
+      date_field: opts?.date_field,
+      search: opts?.search,
+    });
 
-    if (role === 'renter') {
-      where.user_id = userId;
-    } else {
-      where.owner_id = userId;
-    }
-
+    const where = { ...baseWhere };
     if (status) {
       where.status = status.toUpperCase();
     }
 
     const skip = (page - 1) * limit;
 
-    const [bookings, total] = await Promise.all([
+    const bookingInclude = {
+      items: { include: { lens: { include: { images: true } } } },
+      booking_group: {
+        select: {
+          id: true,
+          status: true,
+          total_amount: true,
+          payment_method: true,
+        },
+      },
+      owner: {
+        select: {
+          id: true,
+          full_name: true,
+          phone: true,
+          rating_avg: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          full_name: true,
+          phone: true,
+          rating_avg: true,
+        },
+      },
+    } as const;
+
+    const queries: [
+      ReturnType<typeof this.prisma.booking.findMany>,
+      ReturnType<typeof this.prisma.booking.count>,
+      Promise<Record<string, number>> | Promise<null>,
+    ] = [
       this.prisma.booking.findMany({
         where,
-        orderBy: { created_at: 'desc' },
+        orderBy: [
+          { booking_group_id: { sort: 'desc', nulls: 'last' } },
+          { created_at: 'desc' },
+        ],
         skip,
         take: limit,
-        include: {
-          items: { include: { lens: { include: { images: true } } } },
-          owner: {
-            select: {
-              id: true,
-              full_name: true,
-              phone: true,
-              rating_avg: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              full_name: true,
-              phone: true,
-              rating_avg: true,
-            },
-          },
-        },
+        include: bookingInclude,
       }),
       this.prisma.booking.count({ where }),
-    ]);
+      role === 'owner'
+        ? this.countBookingsByStatus(baseWhere)
+        : Promise.resolve(null),
+    ];
+
+    const [bookings, total, status_counts] = await Promise.all(queries);
 
     return {
       data: bookings,
@@ -566,22 +644,143 @@ export class BookingsService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      ...(status_counts ? { status_counts } : {}),
     };
   }
 
-  async getOwnerStats(ownerId: string) {
-    const totalOrders = await this.prisma.booking.count({
-      where: { owner_id: ownerId },
+  private buildBookingListWhere(
+    userId: string,
+    role: 'renter' | 'owner',
+    opts?: {
+      from_date?: string;
+      to_date?: string;
+      date_field?: 'start' | 'end' | 'overlap';
+      search?: string;
+    },
+  ) {
+    const where: Record<string, unknown> =
+      role === 'renter' ? { user_id: userId } : { owner_id: userId };
+
+    const dateField = opts?.date_field ?? 'overlap';
+    const from = opts?.from_date
+      ? parseDateOnlyLocal(opts.from_date)
+      : undefined;
+    const to = opts?.to_date ? parseDateOnlyLocal(opts.to_date) : undefined;
+
+    if (from || to) {
+      if (dateField === 'start') {
+        const clause: Record<string, Date> = {};
+        if (from) clause.gte = from;
+        if (to) clause.lte = to;
+        where.start_date = clause;
+      } else if (dateField === 'end') {
+        const clause: Record<string, Date> = {};
+        if (from) clause.gte = from;
+        if (to) clause.lte = to;
+        where.end_date = clause;
+      } else {
+        if (from) where.end_date = { gte: from };
+        if (to) where.start_date = { lte: to };
+      }
+    }
+
+    const q = opts?.search?.trim();
+    if (q) {
+      const and = (where.AND as unknown[]) ?? [];
+      and.push({
+        OR: [
+          { id: { contains: q, mode: 'insensitive' } },
+          { user: { full_name: { contains: q, mode: 'insensitive' } } },
+          {
+            items: {
+              some: { lens: { title: { contains: q, mode: 'insensitive' } } },
+            },
+          },
+        ],
+      });
+      where.AND = and;
+    }
+
+    return where;
+  }
+
+  private async countBookingsByStatus(
+    baseWhere: Record<string, unknown>,
+  ): Promise<Record<string, number>> {
+    const rows = await this.prisma.booking.groupBy({
+      by: ['status'],
+      where: baseWhere,
+      _count: { _all: true },
     });
-    const activeOrders = await this.prisma.booking.count({
-      where: { owner_id: ownerId, status: 'ACTIVE' },
-    });
-    const completedOrders = await this.prisma.booking.count({
-      where: { owner_id: ownerId, status: 'COMPLETED' },
-    });
-    const cancelledOrders = await this.prisma.booking.count({
-      where: { owner_id: ownerId, status: 'CANCELLED' },
-    });
+    const counts: Record<string, number> = { all: 0 };
+    for (const row of rows) {
+      counts[row.status] = row._count._all;
+      counts.all += row._count._all;
+    }
+    return counts;
+  }
+
+  async getOwnerStats(
+    ownerId: string,
+    opts?: { month?: number; year?: number },
+  ) {
+    const now = new Date();
+    const year = opts?.year ?? now.getFullYear();
+    const month = opts?.month ?? now.getMonth() + 1;
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const periodWhere = {
+      owner_id: ownerId,
+      status: 'COMPLETED' as const,
+      updated_at: { gte: periodStart, lte: periodEnd },
+    };
+
+    const [
+      totalOrders,
+      activeOrders,
+      completedOrders,
+      cancelledOrders,
+      periodCompleted,
+      owner,
+    ] = await Promise.all([
+      this.prisma.booking.count({ where: { owner_id: ownerId } }),
+      this.prisma.booking.count({
+        where: { owner_id: ownerId, status: 'ACTIVE' },
+      }),
+      this.prisma.booking.count({
+        where: { owner_id: ownerId, status: 'COMPLETED' },
+      }),
+      this.prisma.booking.count({
+        where: { owner_id: ownerId, status: 'CANCELLED' },
+      }),
+      this.prisma.booking.findMany({
+        where: periodWhere,
+        select: { total_price: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { rating_avg: true },
+      }),
+    ]);
+
+    const periodRevenue = periodCompleted.reduce(
+      (sum, b) => sum + Number(b.total_price),
+      0,
+    );
+    const periodRentals = periodCompleted.length;
+
+    const revenue_growth = await this.buildOwnerMonthlyRevenueChart(
+      ownerId,
+      year,
+      month,
+    );
+    const top_lenses = await this.buildOwnerTopLensesFromCompleted(
+      ownerId,
+      periodStart,
+      periodEnd,
+    );
+    const vacancy_rate = await this.computeOwnerVacancyRate(ownerId);
 
     const completedBookings = await this.prisma.booking.findMany({
       where: { owner_id: ownerId, status: 'COMPLETED' },
@@ -592,22 +791,14 @@ export class BookingsService {
       0,
     );
 
-    const owner = await this.prisma.user.findUnique({
-      where: { id: ownerId },
-      select: { rating_avg: true },
-    });
-
-    const revenue_growth = await this.buildOwnerMonthlyRevenueChart(ownerId);
-    const top_lenses = await this.buildOwnerTopLensesFromCompleted(ownerId);
-    const vacancy_rate = await this.computeOwnerVacancyRate(ownerId);
-
     return {
+      period: { month, year, label: `Tháng ${month}, ${year}` },
       total_orders: totalOrders,
       active_orders: activeOrders,
       completed_orders: completedOrders,
       cancelled_orders: cancelledOrders,
-      total_revenue: totalRevenue,
-      successful_rentals: completedOrders,
+      total_revenue: periodRevenue,
+      successful_rentals: periodRentals,
       vacancy_rate,
       rating_avg: owner?.rating_avg ?? null,
       status_distribution: {
@@ -617,7 +808,7 @@ export class BookingsService {
       },
       revenue_growth,
       top_lenses,
-      /** So sánh doanh thu đơn COMPLETED: tháng cuối vs tháng liền trước (null nếu không tính được) */
+      all_time_revenue: totalRevenue,
       revenue_mom_pct: this.computeMomPercent(revenue_growth),
     };
   }
@@ -1111,10 +1302,14 @@ export class BookingsService {
 
   // ─── PRIVATE HELPERS ───────────────────────
 
-  /** 12 tháng gần nhất, key `YYYY-MM` (theo lịch local server). */
-  private buildLast12MonthYmKeys(): string[] {
+  /** 12 tháng gần nhất, key `YYYY-MM` (kết thúc tại tháng chỉ định hoặc hiện tại). */
+  private buildLast12MonthYmKeys(endYear?: number, endMonth?: number): string[] {
     const keys: string[] = [];
-    const anchor = new Date();
+    const anchor = new Date(
+      endYear ?? new Date().getFullYear(),
+      (endMonth ?? new Date().getMonth() + 1) - 1,
+      1,
+    );
     for (let i = 11; i >= 0; i -= 1) {
       const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
       keys.push(
@@ -1130,8 +1325,10 @@ export class BookingsService {
    */
   private async buildOwnerMonthlyRevenueChart(
     ownerId: string,
+    endYear?: number,
+    endMonth?: number,
   ): Promise<{ label: string; value: number }[]> {
-    const keys = this.buildLast12MonthYmKeys();
+    const keys = this.buildLast12MonthYmKeys(endYear, endMonth);
     const rows = await this.prisma.$queryRaw<
       { ym: string; revenue: unknown }[]
     >`
@@ -1198,9 +1395,19 @@ export class BookingsService {
    * Top lens: doanh thu = phân bổ total_price đơn COMPLETED theo trọng số
    * (price_per_day × ngày thuê × quantity) trên từng dòng item.
    */
-  private async buildOwnerTopLensesFromCompleted(ownerId: string) {
+  private async buildOwnerTopLensesFromCompleted(
+    ownerId: string,
+    periodStart?: Date,
+    periodEnd?: Date,
+  ) {
     const bookings = await this.prisma.booking.findMany({
-      where: { owner_id: ownerId, status: 'COMPLETED' },
+      where: {
+        owner_id: ownerId,
+        status: 'COMPLETED',
+        ...(periodStart && periodEnd
+          ? { updated_at: { gte: periodStart, lte: periodEnd } }
+          : {}),
+      },
       select: {
         total_price: true,
         start_date: true,

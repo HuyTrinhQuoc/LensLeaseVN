@@ -27,6 +27,7 @@ model User {
   bio                        String?
   cccd_back                  String?
   cccd_front                 String?
+  cccd_number                String?                   @unique
   created_at                 DateTime                  @default(now())
   kyc_status                 ApprovalStatus?
   updated_at                 DateTime                  @default(now()) @updatedAt
@@ -50,8 +51,27 @@ model User {
   reviews_written            Review[]                  @relation("Reviewer")
   transactions               Transaction[]
   wallet                     Wallet?
+  owner_applications         OwnerApplication[]
 
   @@map("users")
+}
+
+model OwnerApplication {
+  id               String          @id @default(uuid()) @db.Uuid
+  user_id          String          @db.Uuid
+  phone            String
+  area             String
+  equipment_types  String
+  description      String?
+  status           ApprovalStatus  @default(PENDING)
+  admin_note       String?
+  reviewed_at      DateTime?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  user             User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@map("owner_applications")
 }
 
 model BankDetail {

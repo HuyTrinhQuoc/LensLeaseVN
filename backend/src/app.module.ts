@@ -13,7 +13,12 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminUserModule } from './admin-user/admin-user.module';
+import { AdminFinanceModule } from './admin-finance/admin-finance.module';
+import { AdminListingsModule } from './admin-listings/admin-listings.module';
 import { HandoverModule } from './modules/handover/handover.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
+import { EkycModule } from './modules/ekyc/ekyc.module';
+import { OwnerApplicationsModule } from './modules/owner-applications/owner-applications.module';
 
 @Module({
   imports: [
@@ -29,7 +34,12 @@ import { HandoverModule } from './modules/handover/handover.module';
     PaymentsModule,
     ChatModule,
     AdminUserModule,
+    AdminFinanceModule,
+    AdminListingsModule,
     HandoverModule,
+    PromotionsModule,
+    EkycModule,
+    OwnerApplicationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, MailService],

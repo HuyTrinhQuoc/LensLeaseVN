@@ -40,6 +40,7 @@ export const BOOKING_SCHEDULE_UI = {
   subtotal: 'Tạm tính',
 
   addToCart: 'Thêm vào giỏ hàng',
+  bookNow: 'Đặt ngay',
   processing: 'Đang xử lý…',
   viewCart: 'Xem giỏ hàng',
 
@@ -70,7 +71,7 @@ export const BOOKING_SCHEDULE_UI = {
   browseProducts: 'Chọn thiết bị',
 
   /** UX nâng cao (sidebar / panel) */
-  uxFlowSteps: '1) Chọn tháng xem ô màu  →  2) Chọn ngày nhận / trả  →  3) Kiểm tra lịch  →  4) Thêm giỏ.',
+  uxFlowSteps: '1) Chọn tháng xem ô màu  →  2) Chọn ngày nhận / trả  →  3) Kiểm tra lịch  →  4) Đặt ngay hoặc thêm giỏ.',
   uxAdvancedToggle: 'Chi tiết: tự làm mới lịch',
   uxQuickRentLabel: 'Gợi ý thời gian thuê (từ ngày nhận):',
   uxQuickRentDays: (n: number) => `${n} ngày`,

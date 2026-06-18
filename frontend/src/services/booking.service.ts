@@ -41,7 +41,11 @@ export const bookingService = {
     return api.post('/bookings', body);
   },
 
-  checkoutGroup(body: { items: CreateBookingBody[]; cart_item_ids?: string[] }) {
+  checkoutGroup(body: {
+    items: CreateBookingBody[];
+    cart_item_ids?: string[];
+    promotion_code?: string;
+  }) {
     return api.post('/bookings/checkout-group', body);
   },
 
@@ -50,6 +54,10 @@ export const bookingService = {
     status?: string;
     page?: number;
     limit?: number;
+    from_date?: string;
+    to_date?: string;
+    date_field?: 'start' | 'end' | 'overlap';
+    search?: string;
   }) {
     return api.get('/bookings', { params });
   },
@@ -90,8 +98,8 @@ export const bookingService = {
     return api.patch(`/bookings/${id}/extend/reject`);
   },
 
-  getOwnerStats() {
-    return api.get('/bookings/owner/stats');
+  getOwnerStats(params?: { month?: number; year?: number }) {
+    return api.get('/bookings/owner/stats', { params });
   },
 
   // kiểm tra quá hạn và trả máy

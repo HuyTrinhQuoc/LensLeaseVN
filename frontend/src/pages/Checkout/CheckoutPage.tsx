@@ -2,9 +2,22 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { bookingService } from '../../services/booking.service';
 import { walletService } from '../../services/wallet.service';
+import { ekycService } from '../../services/ekyc.service';
 import { getAuthToken } from '../../utils/auth';
 import { platformFeeFromSubtotal, rentalLineSubtotal } from '../../utils/pricing';
 import LensRentalSchedulePanel from '../../components/scheduling/LensRentalSchedulePanel';
+import { PromotionPicker } from '../../components/promotion/PromotionPicker';
+import {
+  type AppliedPromotion,
+  getStoredPromotionCode,
+  setStoredPromotionCode,
+} from '../../services/promotion.service';
+import { isRealCartItemId } from '../../utils/instant-checkout';
+import { paymentService, type TopupChannel } from '../../services/payment.service';
+import { redirectBookingGroupPayment } from '../../utils/booking-group-payment';
+import type { CheckoutSuccessPayload } from './SuccessPage';
+
+type CheckoutPayChannel = TopupChannel | 'WALLET';
 
 function Icon({ name, className = '' }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -55,6 +68,12 @@ const CheckoutPage: React.FC = () => {
   const [depositNote, setDepositNote] = useState('');
 
   const [walletAvailable, setWalletAvailable] = useState<number | null>(null);
+  const [kycChecking, setKycChecking] = useState(true);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromotion | null>(null);
+  const [vnpayOn, setVnpayOn] = useState(false);
+  const [momoOn, setMomoOn] = useState(false);
+  const [payChannel, setPayChannel] = useState<CheckoutPayChannel>('VNPAY');
+  const [redirectingPay, setRedirectingPay] = useState(false);
 
   const allowedDeposits = useMemo(() => intersectDepositTypes(selectedItems), [selectedItems]);
 
@@ -68,6 +87,28 @@ const CheckoutPage: React.FC = () => {
       navigate('/cart', { replace: true });
     }
   }, [navigate, selectedItems.length]);
+
+  useEffect(() => {
+    if (!getAuthToken() || selectedItems.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await ekycService.getStatus();
+        if (!cancelled && !res.data?.is_verified) {
+          navigate('/Verification', { replace: true, state: { selectedItems } });
+        }
+      } catch {
+        if (!cancelled) {
+          navigate('/Verification', { replace: true, state: { selectedItems } });
+        }
+      } finally {
+        if (!cancelled) setKycChecking(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, selectedItems]);
 
   useEffect(() => {
     if (!allowedDeposits.includes(depositType)) {
@@ -96,6 +137,25 @@ const CheckoutPage: React.FC = () => {
     };
   }, [selectedItems.length]);
 
+  useEffect(() => {
+    void paymentService
+      .getGatewayConfig()
+      .then((r) => {
+        const v = !!r.data?.data?.vnpay;
+        const m = !!r.data?.data?.momo;
+        setVnpayOn(v);
+        setMomoOn(m);
+        if (v) setPayChannel('VNPAY');
+        else if (m) setPayChannel('MOMO');
+        else setPayChannel('WALLET');
+      })
+      .catch(() => {
+        setVnpayOn(false);
+        setMomoOn(false);
+        setPayChannel('WALLET');
+      });
+  }, []);
+
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN').format(price);
 
   const subtotal = selectedItems.reduce(
@@ -108,7 +168,9 @@ const CheckoutPage: React.FC = () => {
     0,
   );
   const totalDeposit = selectedItems.reduce((sum, i) => sum + i.deposit * i.quantity, 0);
-  const rentalPlusPlatform = subtotal + platformFeeTotal;
+  const discount = appliedPromo?.discount_amount ?? 0;
+  const rentalPlusPlatform = Math.max(0, subtotal + platformFeeTotal - discount);
+  const lensIds = useMemo(() => selectedItems.map((i) => i.lensId), [selectedItems]);
   /** Khớp backend `chargeRenterOnConfirm`: chỉ cộng cọc vào trừ ví khi MONEY_PLATFORM. */
   const totalDepositWallet = depositType === 'MONEY_PLATFORM' ? totalDeposit : 0;
   const totalWhenOwnersConfirm = rentalPlusPlatform + totalDepositWallet;
@@ -117,6 +179,9 @@ const CheckoutPage: React.FC = () => {
     walletAvailable != null && walletAvailable < totalWhenOwnersConfirm
       ? totalWhenOwnersConfirm - walletAvailable
       : 0;
+
+  const onlineGatewayOn = vnpayOn || momoOn;
+  const usesOnlinePay = payChannel === 'VNPAY' || payChannel === 'MOMO';
 
   const handleCheckout = async () => {
     setLoading(true);
@@ -136,6 +201,19 @@ const CheckoutPage: React.FC = () => {
         throw new Error('Vui lòng ghi chú loại giấy tờ / tài sản cọc (ví dụ: CCCD số…).');
       }
 
+      if (usesOnlinePay) {
+        if (payChannel === 'VNPAY' && !vnpayOn) {
+          throw new Error('VNPay chưa được cấu hình trên server.');
+        }
+        if (payChannel === 'MOMO' && !momoOn) {
+          throw new Error('MoMo chưa được cấu hình trên server.');
+        }
+      } else if (walletShort > 0 && !onlineGatewayOn) {
+        throw new Error(
+          `Ví thiếu khoảng ${formatPrice(walletShort)}đ và chưa bật cổng thanh toán online. Vui lòng nạp ví trước.`,
+        );
+      }
+
       const items = selectedItems.map((item) => ({
         lens_id: item.lensId,
         start_date: item.startDate,
@@ -147,14 +225,45 @@ const CheckoutPage: React.FC = () => {
         deposit_note: depositType === 'PAPERWORK' ? depositNote.trim() : undefined,
       }));
 
-      const cartIds = selectedItems.map((i) => i.id).filter(Boolean);
+      const cartIds = selectedItems.map((i) => i.id).filter(isRealCartItemId);
+      const promotionCode =
+        appliedPromo?.code?.trim() || getStoredPromotionCode() || undefined;
 
       const res = await bookingService.checkoutGroup({
         items,
         cart_item_ids: cartIds.length ? cartIds : undefined,
+        promotion_code: promotionCode,
       });
 
-      const payload = (res.data as { data?: unknown })?.data;
+      if (promotionCode) {
+        setStoredPromotionCode(null);
+        setAppliedPromo(null);
+      }
+
+      const payload = (res.data as { data?: CheckoutSuccessPayload })?.data;
+      const groupId = payload?.booking_group_id;
+
+      if (usesOnlinePay && groupId) {
+        setRedirectingPay(true);
+        try {
+          await redirectBookingGroupPayment(groupId, payChannel);
+          return;
+        } catch (payErr: unknown) {
+          const payMsg =
+            payErr && typeof payErr === 'object' && 'response' in payErr
+              ? (payErr as { response?: { data?: { message?: string } } }).response?.data?.message
+              : undefined;
+          navigate('/success', {
+            replace: true,
+            state: {
+              checkout: payload,
+              paymentError: payMsg || (payErr instanceof Error ? payErr.message : 'Không mở được cổng thanh toán'),
+            },
+          });
+          return;
+        }
+      }
+
       navigate('/success', { replace: true, state: { checkout: payload } });
     } catch (err: unknown) {
       console.error(err);
@@ -163,6 +272,7 @@ const CheckoutPage: React.FC = () => {
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       setError(msg || (err instanceof Error ? err.message : 'Lỗi khi tạo đơn thuê'));
+      setRedirectingPay(false);
     } finally {
       setLoading(false);
     }
@@ -177,6 +287,14 @@ const CheckoutPage: React.FC = () => {
   }
 
   if (selectedItems.length === 0) return null;
+
+  if (kycChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f7fa] text-sm text-gray-500">
+        Đang kiểm tra eKYC…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f4f7fa] text-gray-800 antialiased">
@@ -259,25 +377,70 @@ const CheckoutPage: React.FC = () => {
               
               {/* PHẦN 1: ĐẶT CỌC */}
               <div className="mb-8">
-                <label className="mb-3 block text-sm font-bold text-gray-700">1. Hình thức đặt cọc (Bắt buộc qua sàn)</label>
+                <label className="mb-3 block text-sm font-bold text-gray-700">
+                  1. Hình thức đặt cọc
+                </label>
                 <div className="space-y-3">
-                  <div className="flex items-start gap-3 rounded-xl border border-[#0b45b3] bg-blue-50/50 p-4 text-sm shadow-sm">
-                    <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#0b45b3] text-white">
-                      <Icon name="check" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 font-bold text-gray-900">
-                        Cọc qua ví nền tảng (ký quỹ)
-                        <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700">
-                          <Icon name="verified_user" /> An toàn 100%
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-600">
-                        Tiền cọc được LensLease giữ an toàn và hoàn trả ngay khi bạn hoàn tất đơn thuê.
-                      </p>
-                    </div>
-                  </div>
+                  {allowedDeposits.map((type) => {
+                    const selected = depositType === type;
+                    const isPlatform = type === 'MONEY_PLATFORM';
+                    return (
+                      <label
+                        key={type}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-all ${
+                          selected
+                            ? 'border-[#0b45b3] bg-blue-50/50 shadow-sm'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="depositType"
+                          checked={selected}
+                          onChange={() => setDepositType(type)}
+                          className="mt-1 h-4 w-4 text-[#0b45b3]"
+                        />
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 font-bold text-gray-900">
+                            {DEPOSIT_LABELS[type]}
+                            {isPlatform && (
+                              <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700">
+                                <Icon name="verified_user" /> Khuyến nghị
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-gray-600">
+                            {type === 'MONEY_PLATFORM' &&
+                              'Tiền cọc được LensLease giữ an toàn và hoàn trả khi hoàn tất đơn thuê.'}
+                            {type === 'MONEY_DIRECT' &&
+                              'Bạn chuyển cọc trực tiếp cho chủ máy khi giao nhận — không giữ trên ví nền tảng.'}
+                            {type === 'PAPERWORK' &&
+                              'Giữ giấy tờ tùy thân (CCCD/hộ chiếu) hoặc tài sản có giá theo thỏa thuận với chủ máy.'}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {allowedDeposits.length === 0 && (
+                    <p className="text-sm text-amber-700">
+                      Không có hình thức cọc chung cho tất cả sản phẩm trong giỏ. Vui lòng tách đơn.
+                    </p>
+                  )}
                 </div>
+                {depositType === 'PAPERWORK' && (
+                  <div className="mt-4">
+                    <label className="mb-2 block text-xs font-semibold text-gray-700">
+                      Ghi chú giấy tờ / tài sản cọc
+                    </label>
+                    <textarea
+                      value={depositNote}
+                      onChange={(e) => setDepositNote(e.target.value)}
+                      rows={2}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      placeholder="Ví dụ: CCCD số 079…, hoặc thẻ tín dụng ký gửi"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* PHẦN 2: GIAO NHẬN */}
@@ -326,21 +489,99 @@ const CheckoutPage: React.FC = () => {
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-              <h2 className="mb-2 text-lg font-bold text-gray-900">Thanh toán & ví</h2>
-              <p className="text-sm leading-relaxed text-gray-600">
-                Hệ thống dùng <strong className="text-gray-800">Ví ký quỹ nội bộ</strong>. Sau khi bạn bấm xác nhận,
-                các đơn ở trạng thái <strong>Chờ duyệt</strong>. Khi chủ thiết bị duyệt từng đơn, số tiền tương ứng
-                (tiền thuê + phí sàn 8%{' '}
-                {depositType === 'MONEY_PLATFORM' ? '+ ký quỹ nền tảng (nếu có)' : ''}) sẽ được{' '}
-                <strong>trừ từ ví</strong> theo cấu hình backend. Trên trang kết quả đặt thuê, bạn có thể{' '}
-                <strong>thanh toán VNPay một lần cho cả nhóm</strong> (tiền vào ví + đánh dấu đã thanh toán online)
-                nếu server đã bật VNPay.
+              <h2 className="mb-4 text-lg font-bold text-gray-900">Mã khuyến mãi</h2>
+              <PromotionPicker
+                subtotal={subtotal}
+                lensIds={lensIds}
+                appliedPromo={appliedPromo}
+                onChange={setAppliedPromo}
+                variant="checkout"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+              <h2 className="mb-2 text-lg font-bold text-gray-900">Thanh toán</h2>
+              <p className="mb-4 text-sm leading-relaxed text-gray-600">
+                Sau khi tạo đơn, bạn có thể{' '}
+                <strong>thanh toán ngay qua cổng online</strong> (tiền vào ví ký quỹ + đánh dấu nhóm đã thanh toán).
+                Khi chủ duyệt, hệ thống trừ ví theo từng đơn (tiền thuê + phí sàn 8%
+                {depositType === 'MONEY_PLATFORM' ? ' + ký quỹ nền tảng' : ''}).
               </p>
+
+              {onlineGatewayOn ? (
+                <div className="space-y-3">
+                  {vnpayOn && (
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-sm transition-all ${
+                        payChannel === 'VNPAY'
+                          ? 'border-[#0e4194] bg-blue-50/60 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payChannel"
+                        checked={payChannel === 'VNPAY'}
+                        onChange={() => setPayChannel('VNPAY')}
+                        className="h-4 w-4 text-[#0e4194]"
+                      />
+                      <span className="font-semibold text-gray-900">VNPay — thanh toán ngay sau khi gửi đơn</span>
+                    </label>
+                  )}
+                  {momoOn && (
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-sm transition-all ${
+                        payChannel === 'MOMO'
+                          ? 'border-[#a50064] bg-pink-50/50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payChannel"
+                        checked={payChannel === 'MOMO'}
+                        onChange={() => setPayChannel('MOMO')}
+                        className="h-4 w-4 text-[#a50064]"
+                      />
+                      <span className="font-semibold text-gray-900">MoMo — thanh toán ngay sau khi gửi đơn</span>
+                    </label>
+                  )}
+                  {walletShort === 0 && (
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-sm transition-all ${
+                        payChannel === 'WALLET'
+                          ? 'border-emerald-600 bg-emerald-50/50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payChannel"
+                        checked={payChannel === 'WALLET'}
+                        onChange={() => setPayChannel('WALLET')}
+                        className="h-4 w-4 text-emerald-600"
+                      />
+                      <span className="font-semibold text-gray-900">
+                        Dùng số dư ví hiện có ({formatPrice(walletAvailable ?? 0)}đ)
+                      </span>
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Cổng VNPay/MoMo chưa bật trên server. Đơn vẫn được tạo; hãy{' '}
+                  <Link to="/wallet" className="font-semibold underline">
+                    nạp ví
+                  </Link>{' '}
+                  trước khi chủ duyệt.
+                </p>
+              )}
+
               <p className="mt-3 text-sm">
                 <Link to="/wallet" className="font-semibold text-[#0b45b3] underline">
                   Mở ví ký quỹ
                 </Link>{' '}
-                để nạp tiền, xem sổ cái hoặc rút tiền. Thanh toán VNPay sau khi đặt thuê nằm ở trang xác nhận đơn.
+                để xem số dư và lịch sử giao dịch.
               </p>
             </div>
 
@@ -366,10 +607,16 @@ const CheckoutPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleCheckout()}
-                disabled={loading}
-                className={`inline-flex items-center justify-center rounded-xl px-8 py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition ${loading ? 'cursor-not-allowed bg-gray-400' : 'bg-[#0b45b3] hover:bg-blue-800'}`}
+                disabled={loading || redirectingPay}
+                className={`inline-flex items-center justify-center rounded-xl px-8 py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition ${loading || redirectingPay ? 'cursor-not-allowed bg-gray-400' : 'bg-[#0b45b3] hover:bg-blue-800'}`}
               >
-                {loading ? 'Đang tạo đơn...' : 'Gửi yêu cầu thuê'}
+                {redirectingPay
+                  ? 'Đang chuyển tới cổng thanh toán…'
+                  : loading
+                    ? 'Đang tạo đơn...'
+                    : usesOnlinePay
+                      ? 'Gửi yêu cầu & thanh toán ngay'
+                      : 'Gửi yêu cầu thuê'}
               </button>
             </div>
           </div>
@@ -391,6 +638,13 @@ const CheckoutPage: React.FC = () => {
                   <span className="font-medium text-gray-900">{formatPrice(platformFeeTotal)}đ</span>
                 </div>
 
+                {discount > 0 && appliedPromo && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>Giảm giá ({appliedPromo.code})</span>
+                    <span className="font-semibold">−{formatPrice(discount)}đ</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between pt-2">
                   <span className="font-bold text-gray-600">Giá trị cọc (theo thiết bị)</span>
                   <span className="font-bold text-gray-900">{formatPrice(totalDeposit)}đ</span>
@@ -411,7 +665,8 @@ const CheckoutPage: React.FC = () => {
                   {formatPrice(totalWhenOwnersConfirm)}đ
                 </div>
                 <p className="text-right text-xs text-gray-500">
-                  = {formatPrice(rentalPlusPlatform)}đ (thuê + phí sàn)
+                  = {formatPrice(rentalPlusPlatform)}đ (thuê + phí sàn
+                  {discount > 0 ? ` − ${formatPrice(discount)}đ KM` : ''})
                   {totalDepositWallet > 0
                     ? ` + ${formatPrice(totalDepositWallet)}đ (ký quỹ qua ví)`
                     : ' (không cọc qua ví nền tảng)'}
