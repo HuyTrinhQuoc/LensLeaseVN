@@ -81,8 +81,25 @@ const AdminLayout: React.FC = () => {
             <span className="material-symbols-outlined text-[24px]">payments</span>
             Tài chính
           </NavLink>
-        </nav>
 
+             <NavLink to="/admin" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined">category</span>
+            Quản lí danh mục
+          </NavLink>
+
+             <NavLink to="/admin" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined">assignment</span>
+            Quản lí đơn thuê
+          </NavLink>
+
+             <NavLink to="/admin" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">payments</span>
+            Quản lí hệ thống
+          </NavLink>
+        </nav>
+<span className="material-symbols-outlined">category</span>
+<span className="material-symbols-outlined">assignment</span>
+<span className="material-symbols-outlined">settings</span>
         <div className="p-4 bg-surface-container-lowest">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container-highest cursor-pointer transition-colors group">
             <div className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center text-base font-bold shadow-sm">AP</div>

@@ -13,6 +13,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminUserModule } from './admin-user/admin-user.module';
+import { AdminDashboardModule } from './admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AdminUserModule } from './admin-user/admin-user.module';
     PaymentsModule,
     ChatModule,
     AdminUserModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, MailService],
