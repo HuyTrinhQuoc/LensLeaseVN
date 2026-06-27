@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import BookingGroupVnpayButton from '../../components/wallet/BookingGroupVnpayButton';
 import { paymentService } from '../../services/payment.service';
 import { getAuthToken } from '../../utils/auth';
 
@@ -21,10 +22,6 @@ export type CheckoutSuccessPayload = {
   bookings?: SuccessBooking[];
 };
 
-/** Logo VNPay (nguồn ngoài — có thể thay bằng file trong `/public` khi deploy). */
-const VNPAY_LOGO_URL =
-  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRAVztuTczylvs5j_Yqd_nneg23zDdg0wSmcMzApHUxGA&s&ec=121691717';
-
 function formatShortId(id: string) {
   return id.replace(/-/g, '').slice(0, 8).toUpperCase();
 }
@@ -39,6 +36,7 @@ function formatDateVi(iso?: string) {
 export default function BookingSuccessPage() {
   const location = useLocation();
   const checkout = location.state?.checkout as CheckoutSuccessPayload | undefined;
+  const paymentError = (location.state as { paymentError?: string } | null)?.paymentError;
 
   const groupId = checkout?.booking_group_id;
   const bookings = checkout?.bookings ?? [];
@@ -46,8 +44,6 @@ export default function BookingSuccessPage() {
   const groupStatus = checkout?.booking_group_status;
 
   const [vnpayOn, setVnpayOn] = useState(false);
-  const [payBusy, setPayBusy] = useState(false);
-  const [payErr, setPayErr] = useState('');
 
   useEffect(() => {
     void paymentService
@@ -100,6 +96,13 @@ export default function BookingSuccessPage() {
           </div>
 
           <h1 className="text-4xl font-extrabold text-gray-900">Đặt thuê thành công</h1>
+
+          {paymentError ? (
+            <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Đơn đã được tạo nhưng chưa chuyển được sang cổng thanh toán: <strong>{paymentError}</strong>. Bạn
+              có thể thử lại bên dưới.
+            </div>
+          ) : null}
 
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-gray-500">
             Đơn của bạn đang <strong>chờ chủ thiết bị xác nhận</strong>. Tiền trong ví sẽ{' '}
@@ -205,83 +208,8 @@ export default function BookingSuccessPage() {
           </div>
 
           {canVnpayPrepay && groupId ? (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm ring-1 ring-slate-100">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-bold text-slate-900">Thanh toán trước cho nhóm đơn</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                    Chuyển tới cổng <span className="font-semibold text-[#0e4194]">VNPay</span> an toàn. Sau khi thành công,
-                    tiền được <strong className="text-slate-800">cộng vào ví</strong> và nhóm đơn được đánh dấu{' '}
-                    <strong className="text-slate-800">đã thanh toán online</strong>. Khi chủ duyệt, hệ thống vẫn trừ
-                    ví theo từng đơn.
-                  </p>
-                  {payErr ? <p className="mt-2 text-sm font-medium text-red-600">{payErr}</p> : null}
-                </div>
-                <div className="flex shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white px-3 py-2">
-                  <img
-                    src={VNPAY_LOGO_URL}
-                    alt="VNPay"
-                    width={140}
-                    height={72}
-                    className="h-14 w-auto max-w-[160px] object-contain object-center"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={payBusy}
-                onClick={() => {
-                  setPayErr('');
-                  setPayBusy(true);
-                  void (async () => {
-                    try {
-                      const res = await paymentService.createBookingGroupVnpay(groupId);
-                      const url = res.data?.data?.paymentUrl;
-                      if (!url) {
-                        setPayErr('Không nhận được link thanh toán.');
-                        setPayBusy(false);
-                        return;
-                      }
-                      window.location.href = url;
-                    } catch (err: unknown) {
-                      const msg =
-                        err && typeof err === 'object' && 'response' in err
-                          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-                          : undefined;
-                      setPayErr(msg || (err instanceof Error ? err.message : 'Không tạo được thanh toán'));
-                      setPayBusy(false);
-                    }
-                  })();
-                }}
-                className="group mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-[#0e4194] bg-[#0e4194] px-5 py-3.5 text-left shadow-md transition hover:bg-[#0c3578] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[280px]"
-              >
-                {payBusy ? (
-                  <span className="material-symbols-outlined animate-spin text-[28px] text-white">progress_activity</span>
-                ) : (
-                  <span className="rounded-lg bg-white p-1.5 shadow-inner ring-1 ring-white/30">
-                    <img
-                      src={VNPAY_LOGO_URL}
-                      alt="VNPay"
-                      width={120}
-                      height={64}
-                      className="h-11 w-auto max-w-[130px] object-contain object-center"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  </span>
-                )}
-                <span className="flex min-w-0 flex-col text-white">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-100/90">
-                    Thanh toán an toàn
-                  </span>
-                  <span className="text-base font-extrabold leading-tight">Tiến hành qua VNPay</span>
-                </span>
-                <span className="material-symbols-outlined text-[22px] text-white/90 transition group-hover:translate-x-0.5">
-                  arrow_forward
-                </span>
-              </button>
+            <div className="mt-6">
+              <BookingGroupVnpayButton groupId={groupId} />
             </div>
           ) : null}
 

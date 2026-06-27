@@ -48,7 +48,9 @@ export default function ProductCard({ item }: ProductCardProps) {
           <div className="flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap">
             <span className="text-orange-500 text-[10px]">⭐</span>
             <span className="text-[11px] font-bold text-orange-700">
-              {item.rating_avg ? Number(item.rating_avg).toFixed(1) : '4.9'}
+              {item.rating_avg != null && Number(item.rating_avg) > 0
+                ? Number(item.rating_avg).toFixed(1)
+                : '—'}
             </span>
           </div>
         </div>

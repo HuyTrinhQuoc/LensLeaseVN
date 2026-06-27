@@ -4,11 +4,16 @@ import { cartService } from '../../services/cart.service';
 import api from '../../services/api';
 import { API_BASE_URL } from '../../config/api-base';
 import { setSupabaseJWT } from '../../lib/supabase';
+import {
+  consumeInstantCheckout,
+  proceedToCheckoutOrVerification,
+} from '../../utils/instant-checkout';
 
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const fromCart = Boolean((location.state as { cartReturn?: boolean } | null)?.cartReturn);
+  const fromInstant = Boolean((location.state as { instantReturn?: boolean } | null)?.instantReturn);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
@@ -45,6 +50,13 @@ const Auth = () => {
       // KIỂM TRA ROLE VÀ CHUYỂN HƯỚNG
       if (user.role === 'ADMIN') {
         navigate('/admin');
+      } else if (fromInstant) {
+        const items = consumeInstantCheckout();
+        if (items?.length) {
+          await proceedToCheckoutOrVerification(navigate, items);
+        } else {
+          navigate('/checkout');
+        }
       } else {
         navigate(fromCart ? '/cart' : '/');
       }

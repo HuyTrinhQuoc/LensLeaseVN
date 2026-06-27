@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsOptional,
+  IsString,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
@@ -25,4 +26,9 @@ export class CheckoutGroupDto {
   @IsArray()
   @IsUUID('4', { each: true })
   cart_item_ids?: string[];
+
+  @ApiPropertyOptional({ description: 'Mã giảm giá (nếu có)' })
+  @IsOptional()
+  @IsString()
+  promotion_code?: string;
 }

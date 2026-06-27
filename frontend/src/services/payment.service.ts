@@ -31,4 +31,12 @@ export const paymentService = {
       data: { paymentUrl: string; transactionId: string; amountVnd: number };
     }>(`/payments/booking-groups/${encodeURIComponent(groupId)}/vnpay`, body);
   },
+
+  /** MoMo cho BookingGroup: tiền vào ví + nhóm chuyển PAID. */
+  createBookingGroupMomo(groupId: string) {
+    return api.post<{
+      message: string;
+      data: { paymentUrl: string; transactionId: string; amountVnd: number };
+    }>(`/payments/booking-groups/${encodeURIComponent(groupId)}/momo`, {});
+  },
 };

@@ -9,6 +9,7 @@ export const translateRole = (role?: string) => {
   switch (role) {
     case 'ADMIN': return 'Quản trị viên';
     case 'USER': return 'Người dùng';
+    case 'OWNER': return 'Chủ cho thuê';
     case 'LENDER': return 'Chủ thiết bị';
     default: return role || 'Chưa rõ';
   }
@@ -45,7 +46,7 @@ const AdminUserManagement: React.FC = () => {
     searchTerm, setSearchTerm,
     roleFilter, setRoleFilter,
     kycFilter, setKycFilter,
-    setSelectedUser, closeSidebar, handleKycAction
+    setSelectedUser, closeSidebar, handleKycAction, handleLockUser, handleUnlockUser
   } = useAdminUsers();
 
   const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : 'US';
@@ -53,7 +54,7 @@ const AdminUserManagement: React.FC = () => {
   return (
     <main className="flex-1 flex overflow-hidden w-full relative bg-background min-h-screen">
       <section className="flex-1 flex flex-col bg-surface-container-lowest min-w-0 md:min-w-[600px]">
-        
+
         <UserFilters
           searchTerm={searchTerm} setSearchTerm={setSearchTerm}
           roleFilter={roleFilter} setRoleFilter={setRoleFilter}
@@ -71,12 +72,13 @@ const AdminUserManagement: React.FC = () => {
                   <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Vai trò</th>
                   <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Trạng thái KYC</th>
                   <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Ngày đăng ký</th>
-                  <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap text-right">Thao tác</th>
+                  <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Đánh giá</th>
+                  <th className="px-6 py-5 text-sm font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap text-right">Tài khoản</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr 
+                  <tr
                     key={user.id}
                     onClick={() => setSelectedUser(user)}
                     className={`transition-colors cursor-pointer group hover:bg-surface-muted ${selectedUser?.id === user.id ? 'bg-primary/5' : 'bg-surface-container-lowest'}`}
@@ -93,12 +95,12 @@ const AdminUserManagement: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    
+
                     {/* Cột Vai trò (Đã dịch) */}
                     <td className="px-6 py-4 text-base font-medium text-on-surface whitespace-nowrap">
                       {translateRole(user.role)}
                     </td>
-                    
+
                     {/* Cột Trạng thái KYC (Đã tô màu) */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       {renderStatusBadge(user.kyc_status)}
@@ -108,25 +110,58 @@ const AdminUserManagement: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-on-surface-variant font-mono whitespace-nowrap">
                       {formatDate(user.created_at)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+  <div className="flex items-center gap-1">
+    <span className="material-symbols-outlined text-yellow-500 text-[18px]">
+      star
+    </span>
+    <span className="font-semibold">
+      {user.rating_avg?.toFixed(1) ?? '0.0'}
+    </span>
+  </div>
+</td>
+
 
                     {/* Cột Thao tác (Đã khôi phục) */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <button 
+                        <button
                           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${selectedUser?.id === user.id ? 'bg-primary text-white shadow-md' : 'hover:bg-surface-container-high text-on-surface-variant'}`}
                           title="Xem hồ sơ"
                         >
                           <span className="material-symbols-outlined text-[20px]" style={selectedUser?.id === user.id ? { fontVariationSettings: "'FILL' 1" } : {}}>visibility</span>
                         </button>
-                        <button 
-                          className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-error/10 hover:text-error text-outline transition-colors" 
-                          title="Khóa tài khoản"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Ngăn sự kiện click hàng để không mở sidebar
-                            alert(`Chức năng khóa tài khoản ${user.email} đang phát triển`);
+                        <button
+                          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors
+    ${user.status === 'LOCKED'
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                            }
+  `}
+                          title={
+                            user.status === 'LOCKED'
+                              ? 'Mở khóa tài khoản'
+                              : 'Khóa tài khoản'
+                          }
+                          onClick={async (e) => {
+                            e.stopPropagation();
+
+                            if (user.status === 'LOCKED') {
+                              if (window.confirm(`Mở khóa ${user.email}?`)) {
+                                await handleUnlockUser(user.id);
+                              }
+                            } else {
+                              if (window.confirm(`Khóa ${user.email}?`)) {
+                                await handleLockUser(user.id);
+                              }
+                            }
                           }}
                         >
-                          <span className="material-symbols-outlined text-[20px]">lock</span>
+                          <span className="material-symbols-outlined text-[20px]">
+                            {user.status === 'LOCKED'
+                              ? 'lock'
+                              : 'lock_open'}
+                          </span>
                         </button>
                       </div>
                     </td>
@@ -140,8 +175,8 @@ const AdminUserManagement: React.FC = () => {
 
       {selectedUser && (
         <KycSidebar
-          user={selectedUser} 
-          onClose={closeSidebar} 
+          user={selectedUser}
+          onClose={closeSidebar}
           onApprove={() => handleKycAction(selectedUser.id, 'APPROVED')}
           onReject={() => handleKycAction(selectedUser.id, 'REJECTED')}
         />

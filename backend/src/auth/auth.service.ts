@@ -138,7 +138,6 @@ async googleLogin(req: any) {
         is_verified: true,
       },
     });
-    console.log('✅ User mới tạo:', user); // 🆕 Debug
   } else {
     // Cập nhật avatar + provider_id nếu chưa có
     user = await this.prisma.user.update({
@@ -148,7 +147,6 @@ async googleLogin(req: any) {
         provider_id: provider_id || user.provider_id, // 🆕 Cập nhật nếu chưa có
       },
     });
-    console.log('✅ User cập nhật:', user); // 🆕 Debug
   }
 
   const accessToken = this.jwtService.sign({ userId: user.id, role: user.role });

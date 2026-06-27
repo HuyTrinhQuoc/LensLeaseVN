@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/node": "^24.12.2",
+    "@types/node": "^24.13.1",
     "@types/react": "^19.2.14",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19.2.3",

@@ -1,27 +1,61 @@
-import { Controller, Get, Param, Patch, Query, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Body,
+  Headers,
+} from '@nestjs/common';
 import { AdminUserService } from './admin-user.service';
-import { AuthGuard } from '@nestjs/passport';
 
 @Controller('admin/users')
-// @UseGuards(AuthGuard('jwt')) // Nhớ bật Guard để bảo mật API Admin
 export class AdminUserController {
   constructor(private readonly adminUserService: AdminUserService) {}
 
   @Get()
-  getUsers(@Query() query: any) {
+  getUsers(
+    @Headers() headers: Record<string, string>,
+    @Query() query: Record<string, string>,
+  ) {
+    this.adminUserService.assertAdmin(headers);
     return this.adminUserService.getUsers(query);
   }
 
   @Get(':id')
-  getUserDetail(@Param('id') id: string) {
+  getUserDetail(
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+  ) {
+    this.adminUserService.assertAdmin(headers);
     return this.adminUserService.getUserDetail(id);
   }
 
   @Patch(':id/kyc')
   updateKycStatus(
-    @Param('id') id: string, 
-    @Body('status') status: 'APPROVED' | 'REJECTED'
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+    @Body('status') status: 'APPROVED' | 'REJECTED',
   ) {
+    this.adminUserService.assertAdmin(headers);
     return this.adminUserService.updateKycStatus(id, status);
   }
+
+  @Patch(':id/lock')
+lockUser(
+  @Headers() headers: Record<string, string>,
+  @Param('id') id: string,
+) {
+  this.adminUserService.assertAdmin(headers);
+  return this.adminUserService.lockUser(id);
+}
+
+@Patch(':id/unlock')
+unlockUser(
+  @Headers() headers: Record<string, string>,
+  @Param('id') id: string,
+) {
+  this.adminUserService.assertAdmin(headers);
+  return this.adminUserService.unblockUser(id);
+}
 }

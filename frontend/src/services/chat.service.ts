@@ -11,7 +11,6 @@ export class ChatService {
     ownerId: string,
   ): Promise<Conversation> {
     try {
-      console.log('Sending chat request with ownerId:', ownerId);
       const response = await api.post('/chat/conversations', {
         owner_id: ownerId,
       });
@@ -149,9 +148,7 @@ static subscribeToMessages(
   onNewMessage: (message: Message) => void,
 ): () => void {
   const channelName = `messages:${conversationId}`;
-  console.log('🔍 Debug Filter Value:', conversationId, typeof conversationId);
-  console.log('🔍 Channel Name:', channelName);
-  
+
   supabase.removeChannel(supabase.channel(channelName));
 
   let isUnsubscribed = false;
@@ -169,15 +166,11 @@ static subscribeToMessages(
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
-        console.log('✅ Realtime Message Received:', payload.new.content);
         onNewMessage(payload.new as Message);
         lastMessageId = payload.new.id;
       }
     )
     .subscribe((status) => {
-      console.log(`📡 Channel Status: ${status}`);
-      
-      // If realtime fails, start polling as fallback
       if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
         console.warn(`⚠️ Realtime failed (${status}). Starting polling fallback...`);
         
@@ -193,7 +186,6 @@ static subscribeToMessages(
               );
               
               if (messages.length > 0 && messages[0].id !== lastMessageId) {
-                console.log('📬 Polling: New message detected');
                 onNewMessage(messages[0]);
                 lastMessageId = messages[0].id;
               }

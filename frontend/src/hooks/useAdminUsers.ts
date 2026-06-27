@@ -1,17 +1,21 @@
-// hooks/useAdminUsers.ts
 import { useState, useEffect, useCallback } from 'react';
+import api from '../services/api';
 
 export interface UserDetail {
   id: string;
   full_name: string;
   email: string;
   role: string;
+  rating_avg?: number;
   kyc_status: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   created_at: string;
-  cccd_front?: string;
-  cccd_back?: string;
+  cccd_front_url?: string | null;
+  cccd_back_url?: string | null;
+  cccd_number?: string | null;
+  has_cccd_images?: boolean;
   address?: string;
   phone?: string;
+  status?: 'ACTIVE' | 'LOCKED';
 }
 
 export function useAdminUsers() {
@@ -35,9 +39,8 @@ export function useAdminUsers() {
         ...(kycFilter && { kyc_status: kycFilter }),
       });
       
-      const res = await fetch(`http://localhost:3000/admin/users?${queryParams}`);
-      const data = await res.json();
-      setUsers(data);
+      const res = await api.get('/admin/users', { params: Object.fromEntries(queryParams) });
+      setUsers(res.data);
     } catch (error) {
       console.error('Lỗi khi fetch users:', error);
     } finally {
@@ -52,11 +55,7 @@ export function useAdminUsers() {
   // 2. Cập nhật KYC
   const handleKycAction = async (userId: string, action: 'APPROVED' | 'REJECTED') => {
     try {
-      await fetch(`http://localhost:3000/admin/users/${userId}/kyc`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: action })
-      });
+      await api.patch(`/admin/users/${userId}/kyc`, { status: action });
       
       // Cập nhật lại UI sau khi duyệt
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, kyc_status: action } : u));
@@ -71,13 +70,43 @@ export function useAdminUsers() {
   // 3. Lấy chi tiết user khi click
   const handleSelectUser = async (user: UserDetail) => {
     try {
-      const res = await fetch(`http://localhost:3000/admin/users/${user.id}`);
-      const detail = await res.json();
-      setSelectedUser(detail);
+      const res = await api.get(`/admin/users/${user.id}`);
+      setSelectedUser(res.data);
     } catch (error) {
       console.error('Lỗi lấy chi tiết user:', error);
     }
   };
+ const handleLockUser = async (userId: string) => {
+  try {
+    await api.patch(`/admin/users/${userId}/lock`);
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, status: 'LOCKED' }
+          : u
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
+};
+const handleUnlockUser = async (userId: string) => {
+  try {
+    await api.patch(`/admin/users/${userId}/unlock`);
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, status: 'ACTIVE' }
+          : u
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 
   return {
     users,
@@ -89,5 +118,7 @@ export function useAdminUsers() {
     setSelectedUser: handleSelectUser,
     closeSidebar: () => setSelectedUser(null),
     handleKycAction,
+    handleLockUser,
+    handleUnlockUser
   };
 }

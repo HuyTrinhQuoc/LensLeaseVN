@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Headers, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 
@@ -34,7 +34,7 @@ export class UsersController {
     if (!userId) {
       throw new HttpException('Missing x-user-id header', HttpStatus.UNAUTHORIZED);
     }
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findOwnProfile(userId);
     return {
       message: 'Lấy profile thành công',
       data: user,
@@ -55,12 +55,16 @@ export class UsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin User theo ID (Public Profile)' })
+  @ApiOperation({ summary: 'Lấy thông tin User theo ID (Public Profile — không có CCCD)' })
   async getUserById(@Param('id') id: string) {
-    const user = await this.usersService.findById(id);
-    return {
-      message: 'Lấy thông tin user thành công',
-      data: user,
-    };
+    try {
+      const user = await this.usersService.findPublicProfile(id);
+      return {
+        message: 'Lấy thông tin user thành công',
+        data: user,
+      };
+    } catch {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
   }
 }

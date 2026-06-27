@@ -884,6 +884,108 @@
   font-size: 16px;
 }
 
+.cart-coupon__error {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  margin: 0;
+}
+
+.cart-coupon__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.cart-coupon__clear-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-high);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--outline, #e2e8f0);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cart-coupon__clear-btn:hover {
+  background: var(--surface-dim);
+}
+
+.cart-promo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cart-promo-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--outline, #e2e8f0);
+  background: var(--surface-high, #f8fafc);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.cart-promo-card:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #eff6ff;
+}
+
+.cart-promo-card.is-selected {
+  border-color: #10b981;
+  background: #ecfdf5;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.cart-promo-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cart-promo-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.cart-promo-card__code {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.cart-promo-card__save {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--success, #059669);
+}
+
+.cart-promo-card__desc {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.cart-promo-card__exp {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--text-soft);
+}
+
 /* ── Total ── */
 .cart-summary-card__total {
   padding: 16px 0 0;

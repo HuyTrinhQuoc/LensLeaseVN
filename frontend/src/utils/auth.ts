@@ -10,6 +10,17 @@ export function getUserIdFromToken(): string | null {
   }
 }
 
+export function getRoleFromToken(): string | null {
+  const t = localStorage.getItem('token') || localStorage.getItem('accessToken');
+  if (!t || t.split('.').length !== 3) return null;
+  try {
+    const payload = JSON.parse(atob(t.split('.')[1])) as { role?: string };
+    return payload.role ?? null; 
+  } catch {
+    return null;
+  }
+}
+
 export function getAuthToken(): string | null {
   return localStorage.getItem('token') || localStorage.getItem('accessToken');
 }

@@ -1,9 +1,41 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { S3KycStorageService } from '../storage/s3-kyc.storage';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class AdminUserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly s3Kyc: S3KycStorageService,
+  ) {}
+
+  assertAdmin(headers: Record<string, string>): string {
+    const token =
+      headers['authorization']?.replace('Bearer ', '') ||
+      headers['x-user-id'];
+    if (!token) {
+      throw new UnauthorizedException('Vui lòng đăng nhập');
+    }
+
+    if (token.split('.').length === 3) {
+      try {
+        const payload = jwt.verify(
+          token,
+          process.env.JWT_SECRET || 'lenslease_super_secret_key',
+        ) as { userId?: string; role?: string };
+        if (payload.role !== 'ADMIN') {
+          throw new UnauthorizedException('Chỉ admin mới được truy cập');
+        }
+        return payload.userId as string;
+      } catch (e) {
+        if (e instanceof UnauthorizedException) throw e;
+        throw new UnauthorizedException('Token không hợp lệ');
+      }
+    }
+
+    throw new UnauthorizedException('Token không hợp lệ');
+  }
 
   // Lấy danh sách user kèm bộ lọc
   async getUsers(query: { search?: string; role?: string; kyc_status?: string }) {
@@ -28,6 +60,8 @@ export class AdminUserService {
         full_name: true,
         email: true,
         role: true,
+        status: true,
+        rating_avg: true,
         kyc_status: true,
         created_at: true,
       },
@@ -35,17 +69,36 @@ export class AdminUserService {
     });
   }
 
-  // Lấy chi tiết user (bao gồm CCCD để duyệt KYC)
+  // Lấy chi tiết user (signed URL ảnh CCCD — không trả S3 key thô)
   async getUserDetail(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true, full_name: true, email: true, role: true, kyc_status: true,
-        phone: true, address: true, cccd_front: true, cccd_back: true, created_at: true
+        phone: true, address: true, cccd_front: true, cccd_back: true, cccd_number: true, created_at: true
       }
     });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    return user;
+
+    const [cccd_front_url, cccd_back_url] = await Promise.all([
+      this.s3Kyc.resolveViewUrl(user.cccd_front),
+      this.s3Kyc.resolveViewUrl(user.cccd_back),
+    ]);
+
+    return {
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      kyc_status: user.kyc_status,
+      phone: user.phone,
+      address: user.address,
+      created_at: user.created_at,
+      cccd_number: user.cccd_number,
+      cccd_front_url,
+      cccd_back_url,
+      has_cccd_images: Boolean(cccd_front_url && cccd_back_url),
+    };
   }
 
   // Cập nhật trạng thái KYC
@@ -56,4 +109,28 @@ export class AdminUserService {
     });
     return { message: 'Cập nhật trạng thái KYC thành công', user };
   }
+
+
+  async lockUser(id: string) {
+  const user = await this.prisma.user.update({
+    where: { id },
+    data: {
+      status: 'LOCKED',
+    },
+  });
+
+  return {
+    message: 'Khóa tài khoản thành công',
+    user,
+  };
+}
+
+async unblockUser(id: string) {
+  return this.prisma.user.update({
+    where: { id },
+    data: {
+      status: 'ACTIVE',
+    },
+  });
+}
 }

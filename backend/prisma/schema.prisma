@@ -27,6 +27,7 @@ model User {
   bio                        String?
   cccd_back                  String?
   cccd_front                 String?
+  cccd_number                String?                   @unique
   created_at                 DateTime                  @default(now())
   kyc_status                 ApprovalStatus?
   updated_at                 DateTime                  @default(now()) @updatedAt
@@ -50,8 +51,27 @@ model User {
   reviews_written            Review[]                  @relation("Reviewer")
   transactions               Transaction[]
   wallet                     Wallet?
+  owner_applications         OwnerApplication[]
 
   @@map("users")
+}
+
+model OwnerApplication {
+  id               String          @id @default(uuid()) @db.Uuid
+  user_id          String          @db.Uuid
+  phone            String
+  area             String
+  equipment_types  String
+  description      String?
+  status           ApprovalStatus  @default(PENDING)
+  admin_note       String?
+  reviewed_at      DateTime?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  user             User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@map("owner_applications")
 }
 
 model BankDetail {
@@ -214,6 +234,8 @@ model Booking {
   reviews                   Review[]
   transactions              Transaction[]
   wallet_transactions       WalletTransaction[]
+  renter_returned           Boolean                  @default(false)
+  handoverReport           HandoverReport?
 
   @@index([start_date, end_date])
   @@index([status])
@@ -233,6 +255,27 @@ model BookingItem {
   lens          LensListing @relation(fields: [lens_id], references: [id])
 
   @@map("booking_items")
+}
+
+model HandoverReport {
+  id         String   @id @default(uuid()) @db.Uuid 
+  booking_id String   @unique @db.Uuid              
+  booking    Booking  @relation(fields: [booking_id], references: [id])
+  
+  // Dữ liệu lúc Giao máy 
+  note_checkin    String?
+  images_checkin  String[] 
+  signature_a     String?  
+  signature_b     String?  
+  
+  // Dữ liệu lúc Nhận lại máy 
+  note_checkout   String?
+  images_checkout String[]
+  is_damaged      Boolean  @default(false) 
+  
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("handover_report") 
 }
 
 model Dispute {
