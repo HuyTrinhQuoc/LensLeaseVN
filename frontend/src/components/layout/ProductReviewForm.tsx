@@ -5,15 +5,24 @@ import { toast } from "react-hot-toast";
 
 interface ProductReviewFormProps {
   bookingId: string;
-  lensId: string;
+  lensId?: string;      
+  reviewedUserId?: string;  
+  targetName?: string;      
 }
 
-export default function ProductReviewForm({ bookingId, lensId }: ProductReviewFormProps) {
+export default function ProductReviewForm({ 
+  bookingId, 
+  lensId, 
+  reviewedUserId, 
+  targetName 
+}: ProductReviewFormProps) {
   const [rating, setRating] = useState<number>(5); 
   const [comment, setComment] = useState<string>("");
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+
+  const isOwnerReviewing = !!reviewedUserId; 
 
   const handleSubmitReview = async () => {
     if (!comment.trim()) {
@@ -21,7 +30,6 @@ export default function ProductReviewForm({ bookingId, lensId }: ProductReviewFo
       return;
     }
     
-    // 🌟 Lấy trực tiếp ID người dùng đang đăng nhập từ Frontend mã hóa
     const selfId = getUserIdFromToken();
     if (!selfId) {
       toast.error("Không tìm thấy thông tin phiên đăng nhập. Vui lòng thử lại!");
@@ -33,13 +41,18 @@ export default function ProductReviewForm({ bookingId, lensId }: ProductReviewFo
       
       await reviewService.createReview({
         booking_id: bookingId,
-        lens_id: lensId,
+        lens_id: lensId || undefined,
+        reviewed_user_id: reviewedUserId || undefined,
         rating: rating,
         comment: comment,
         reviewer_id: selfId 
-      } as any); 
+      }); 
       
-      toast.success("Đã gửi đánh giá sản phẩm thành công!");
+      toast.success(
+        isOwnerReviewing 
+          ? "Đã gửi đánh giá thành viên thành công!" 
+          : "Đã gửi đánh giá sản phẩm thành công!"
+      );
       setIsSubmitted(true);
       setComment("");
     } catch (error: any) {
@@ -52,19 +65,29 @@ export default function ProductReviewForm({ bookingId, lensId }: ProductReviewFo
 
   if (isSubmitted) {
     return (
-      <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-2xl text-center text-green-700 font-medium text-sm">
-        Cảm ơn bạn đã gửi đánh giá cho sản phẩm này! 🎉
+      <div className="p-6 bg-green-50 border border-green-200 rounded-2xl text-center text-green-700 font-medium text-sm">
+        {isOwnerReviewing 
+          ? "Cảm ơn chủ máy đã gửi đánh giá đóng góp cho cộng đồng người thuê! 🎉" 
+          : "Cảm ơn bạn đã gửi đánh giá cho sản phẩm này! 🎉"
+        }
       </div>
     );
   }
 
   return (
-    <div className="mt-6 p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
-      <h3 className="text-base font-bold text-gray-800 mb-4">Đánh giá thiết bị này</h3>
+    <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
+      <h3 className="text-base font-bold text-gray-900 mb-1">
+        {isOwnerReviewing ? "Đánh giá người thuê máy" : "Đánh giá thiết bị này"}
+      </h3>
+      {targetName && (
+        <p className="text-xs text-gray-500 mb-4">
+          Đối tượng: <span className="font-bold text-gray-700">{targetName}</span>
+        </p>
+      )}
       
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-          Mức độ hài lòng của bạn:
+          {isOwnerReviewing ? "Mức độ uy tín / ý thức của khách thuê:" : "Mức độ hài lòng của bạn:"}
         </label>
         <div className="flex items-center gap-1">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -96,13 +119,17 @@ export default function ProductReviewForm({ bookingId, lensId }: ProductReviewFo
 
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-          Nội dung đánh giá công tâm:
+          Nội dung nhận xét:
         </label>
         <textarea
-          rows={4}
+          rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Ví dụ: Thiết bị rất mới, kính trong không trầy xước, chủ máy nhiệt tình..."
+          placeholder={
+            isOwnerReviewing 
+              ? "Ví dụ: Khách giữ gìn máy cẩn thận, trả đúng giờ hẹn, giao tiếp lịch sự thiện chí..."
+              : "Ví dụ: Thiết bị rất mới, kính trong không trầy xước, chủ máy nhiệt tình..."
+          }
           className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent resize-none placeholder:text-gray-400"
         />
       </div>

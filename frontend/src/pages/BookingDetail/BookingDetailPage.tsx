@@ -4,7 +4,7 @@ import LensRentalSchedulePanel from "../../components/scheduling/LensRentalSched
 import HandoverForm from "../../components/layout/HandoverForm";
 import { bookingService } from "../../services/booking.service";
 import { getAuthToken, getUserIdFromToken } from "../../utils/auth";
-import ProductReviewForm from "../../components/layout/ProductReviewForm"; // Component đánh giá số sao
+import ProductReviewForm from "../../components/layout/ProductReviewForm";
 import {
   addDaysUtcYmd,
   ymdFromApiDateField,
@@ -96,7 +96,8 @@ export default function BookingDetailPage() {
       if (msg) {
         let prodMsg = msg;
         if (msg.includes("Đã duyệt đơn")) {
-          prodMsg = "Phê duyệt đơn đặt thuê thành công! Hệ thống đã khấu trừ số dư tài khoản người thuê.";
+          prodMsg =
+            "Phê duyệt đơn đặt thuê thành công! Hệ thống đã khấu trừ số dư tài khoản người thuê.";
         } else if (msg.includes("Đã gửi xác nhận trả máy")) {
           prodMsg = "Đã gửi xác nhận hoàn trả thiết bị thành công.";
         } else if (msg.includes("Đã hủy đơn")) {
@@ -115,7 +116,9 @@ export default function BookingDetailPage() {
       await load();
     } catch (e: any) {
       toast.dismiss(loadingId);
-      toast.error(e.response?.data?.message || e.message || "Thao tác thất bại");
+      toast.error(
+        e.response?.data?.message || e.message || "Thao tác thất bại",
+      );
     } finally {
       setBusy(false);
     }
@@ -258,11 +261,31 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
-            {/* KHU VỰC ĐÁNH GIÁ SẢN PHẨM (Chỉ hiện khi Đơn hoàn thành COMPLETED và người xem là Người thuê Renter) */}
-            {st === "COMPLETED" && isRenter && lensId && (
-              <div className="p-6 bg-gray-50 border-b border-gray-100">
-                <ProductReviewForm bookingId={booking.id} lensId={lensId} />
-              </div>
+            {/* KHU VỰC ĐÁNH GIÁ SẢN PHẨM */}
+            {st === "COMPLETED" && (
+              <>
+                {isRenter && lensId && (
+                  <div className="p-6 bg-gray-50 border-b border-gray-100">
+                    <ProductReviewForm
+                      bookingId={booking.id}
+                      lensId={lensId}
+                      targetName={lens?.title || "Thiết bị"}
+                    />
+                  </div>
+                )}
+
+                {isOwner && booking.user_id && (
+                  <div className="p-6 bg-amber-50/40 border-b border-gray-100">
+                    <ProductReviewForm
+                      bookingId={booking.id}
+                      reviewedUserId={booking.user_id}
+                      targetName={
+                        booking.user?.full_name || "Khách thuê ẩn danh"
+                      }
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             {/* Các Action Button điều hướng cho Chủ máy */}
@@ -291,33 +314,36 @@ export default function BookingDetailPage() {
                         type="button"
                         disabled={busy}
                         onClick={() => {
-                          toast((t) => (
-                            <div className="flex flex-col gap-3 p-1">
-                              <p className="text-sm font-semibold text-gray-800 text-center">
-                                Bạn chắc chắn muốn từ chối đơn đặt thuê này?
-                              </p>
-                              <div className="flex justify-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    toast.dismiss(t.id);
-                                    void run(
-                                      () => bookingService.reject(booking.id),
-                                      "Đã từ chối đơn.",
-                                    );
-                                  }}
-                                  className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition"
-                                >
-                                  Từ chối đơn
-                                </button>
-                                <button
-                                  onClick={() => toast.dismiss(t.id)}
-                                  className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
-                                >
-                                  Quay lại
-                                </button>
+                          toast(
+                            (t) => (
+                              <div className="flex flex-col gap-3 p-1">
+                                <p className="text-sm font-semibold text-gray-800 text-center">
+                                  Bạn chắc chắn muốn từ chối đơn đặt thuê này?
+                                </p>
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      toast.dismiss(t.id);
+                                      void run(
+                                        () => bookingService.reject(booking.id),
+                                        "Đã từ chối đơn.",
+                                      );
+                                    }}
+                                    className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition"
+                                  >
+                                    Từ chối đơn
+                                  </button>
+                                  <button
+                                    onClick={() => toast.dismiss(t.id)}
+                                    className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
+                                  >
+                                    Quay lại
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ), { duration: 30000, id: "confirm-reject" });
+                            ),
+                            { duration: 30000, id: "confirm-reject" },
+                          );
                         }}
                         className="rounded-xl bg-red-600 px-4 py-2.5 text-white text-sm font-semibold disabled:opacity-50 hover:bg-red-700 transition"
                       >
@@ -339,7 +365,8 @@ export default function BookingDetailPage() {
                   {st === "ACTIVE" && !booking.renter_returned && (
                     <div className="w-full space-y-2">
                       <span className="text-sm text-gray-500 italic block py-2.5 bg-white px-3 border border-gray-200 rounded-xl">
-                        Hệ thống đang đợi người thuê bấm nút xác nhận "Tôi đã hoàn trả thiết bị" trên ứng dụng...
+                        Hệ thống đang đợi người thuê bấm nút xác nhận "Tôi đã
+                        hoàn trả thiết bị" trên ứng dụng...
                       </span>
                       <button
                         type="button"
@@ -409,33 +436,36 @@ export default function BookingDetailPage() {
                     type="button"
                     disabled={busy}
                     onClick={() => {
-                      toast((t) => (
-                        <div className="flex flex-col gap-3 p-1">
-                          <p className="text-sm font-semibold text-gray-800 text-center">
-                            Bạn chắc chắn muốn hủy đơn đặt thuê này?
-                          </p>
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                toast.dismiss(t.id);
-                                void run(
-                                  () => bookingService.cancel(booking.id),
-                                  "Đã hủy đơn.",
-                                );
-                              }}
-                              className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition"
-                            >
-                              Hủy đơn
-                            </button>
-                            <button
-                              onClick={() => toast.dismiss(t.id)}
-                              className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
-                            >
-                              Quay lại
-                            </button>
+                      toast(
+                        (t) => (
+                          <div className="flex flex-col gap-3 p-1">
+                            <p className="text-sm font-semibold text-gray-800 text-center">
+                              Bạn chắc chắn muốn hủy đơn đặt thuê này?
+                            </p>
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  toast.dismiss(t.id);
+                                  void run(
+                                    () => bookingService.cancel(booking.id),
+                                    "Đã hủy đơn.",
+                                  );
+                                }}
+                                className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition"
+                              >
+                                Hủy đơn
+                              </button>
+                              <button
+                                onClick={() => toast.dismiss(t.id)}
+                                className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
+                              >
+                                Quay lại
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ), { duration: 30000, id: "confirm-cancel" });
+                        ),
+                        { duration: 30000, id: "confirm-cancel" },
+                      );
                     }}
                     className="rounded-xl border border-red-200 text-red-700 px-4 py-2.5 text-sm font-semibold disabled:opacity-50 hover:bg-red-50 transition"
                   >
@@ -450,33 +480,40 @@ export default function BookingDetailPage() {
                         type="button"
                         disabled={busy}
                         onClick={() => {
-                          toast((t) => (
-                            <div className="flex flex-col gap-3 p-1">
-                              <p className="text-sm font-semibold text-gray-800 text-center">
-                                Bạn xác nhận đã đem thiết bị đi trả cho chủ máy?
-                              </p>
-                              <div className="flex justify-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    toast.dismiss(t.id);
-                                    void run(
-                                      () => bookingService.renterReturn(booking.id),
-                                      "Đã gửi xác nhận trả máy.",
-                                    );
-                                  }}
-                                  className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition"
-                                >
-                                  Xác nhận trả
-                                </button>
-                                <button
-                                  onClick={() => toast.dismiss(t.id)}
-                                  className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
-                                >
-                                  Hủy bỏ
-                                </button>
+                          toast(
+                            (t) => (
+                              <div className="flex flex-col gap-3 p-1">
+                                <p className="text-sm font-semibold text-gray-800 text-center">
+                                  Bạn xác nhận đã đem thiết bị đi trả cho chủ
+                                  máy?
+                                </p>
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      toast.dismiss(t.id);
+                                      void run(
+                                        () =>
+                                          bookingService.renterReturn(
+                                            booking.id,
+                                          ),
+                                        "Đã gửi xác nhận trả máy.",
+                                      );
+                                    }}
+                                    className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition"
+                                  >
+                                    Xác nhận trả
+                                  </button>
+                                  <button
+                                    onClick={() => toast.dismiss(t.id)}
+                                    className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
+                                  >
+                                    Hủy bỏ
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ), { duration: 60000, id: "confirm-return" });
+                            ),
+                            { duration: 60000, id: "confirm-return" },
+                          );
                         }}
                         className="rounded-xl bg-blue-600 px-5 py-2.5 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
                       >
@@ -484,7 +521,8 @@ export default function BookingDetailPage() {
                       </button>
                     ) : (
                       <div className="text-sm text-green-700 bg-green-50 p-3 rounded-xl border border-green-200">
-                        Bạn đã bấm xác nhận hoàn trả thiết bị. Vui lòng chờ chủ máy nhận máy và đóng đơn.
+                        Bạn đã bấm xác nhận hoàn trả thiết bị. Vui lòng chờ chủ
+                        máy nhận máy và đóng đơn.
                       </div>
                     )}
 
@@ -531,7 +569,8 @@ export default function BookingDetailPage() {
 
             {!isRenter && !isOwner && (
               <div className="p-6 text-sm text-amber-800 bg-amber-50">
-                Bạn không phải người thuê hay chủ máy của đơn này (hoặc token không khớp).
+                Bạn không phải người thuê hay chủ máy của đơn này (hoặc token
+                không khớp).
               </div>
             )}
           </div>

@@ -37,6 +37,22 @@ export class ReviewsService {
       }
     }
 
+    if (dto.reviewed_user_id) {
+      const existingUserReview = await this.prisma.review.findFirst({
+        where: {
+          booking_id: dto.booking_id,
+          reviewed_user_id: dto.reviewed_user_id,
+          reviewer_id: userId,
+        },
+      });
+
+      if (existingUserReview) {
+        throw new BadRequestException(
+          'Bạn đã gửi đánh giá cho khách thuê này trong đơn đặt thuê này rồi.',
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const review = await tx.review.create({
         data: {
@@ -51,15 +67,9 @@ export class ReviewsService {
 
       if (dto.lens_id) {
         const aggregations = await tx.review.aggregate({
-          _avg: {
-            rating: true,
-          },
-          _count: {
-            rating: true,
-          },
-          where: {
-            lens_id: dto.lens_id,
-          },
+          _avg: { rating: true },
+          _count: { rating: true },
+          where: { lens_id: dto.lens_id },
         });
 
         await tx.lensListing.update({
@@ -77,9 +87,7 @@ export class ReviewsService {
 
   async findReviewsByLens(lensId: string) {
     return await this.prisma.review.findMany({
-      where: {
-        lens_id: lensId,
-      },
+      where: { lens_id: lensId },
       include: {
         reviewer: {
           select: {
@@ -88,9 +96,7 @@ export class ReviewsService {
           },
         },
       },
-      orderBy: {
-        created_at: 'desc',
-      },
+      orderBy: { created_at: 'desc' },
     });
   }
 }
