@@ -1,32 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import LensRentalSchedulePanel from '../../components/scheduling/LensRentalSchedulePanel';
-import BookingGroupVnpayButton from '../../components/wallet/BookingGroupVnpayButton';
-import Pagination from '../../components/common/Pagination';
-import { bookingService } from '../../services/booking.service';
-import { paymentService } from '../../services/payment.service';
-import { getAuthToken } from '../../utils/auth';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import LensRentalSchedulePanel from "../../components/scheduling/LensRentalSchedulePanel";
+import BookingGroupVnpayButton from "../../components/wallet/BookingGroupVnpayButton";
+import Pagination from "../../components/common/Pagination";
+import { bookingService } from "../../services/booking.service";
+import { paymentService } from "../../services/payment.service";
+import { getAuthToken } from "../../utils/auth";
 
 const PAGE_SIZE = 10;
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Đang chờ xác nhận',
-  CONFIRMED: 'Đã duyệt',
-  ACTIVE: 'Đang thuê',
-  COMPLETED: 'Hoàn tất',
-  CANCELLED: 'Đã hủy',
-  REJECTED: 'Bị từ chối',
-  OVERDUE: 'Quá hạn',
+  PENDING: "Đang chờ xác nhận",
+  CONFIRMED: "Đã duyệt",
+  ACTIVE: "Đang thuê",
+  COMPLETED: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+  REJECTED: "Bị từ chối",
+  OVERDUE: "Quá hạn",
 };
 
 const statusStyles: Record<string, { bg: string; text: string }> = {
-  PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  CONFIRMED: { bg: 'bg-sky-100', text: 'text-sky-800' },
-  ACTIVE: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  COMPLETED: { bg: 'bg-green-100', text: 'text-green-700' },
-  CANCELLED: { bg: 'bg-gray-100', text: 'text-gray-600' },
-  REJECTED: { bg: 'bg-red-100', text: 'text-red-700' },
-  OVERDUE: { bg: 'bg-orange-100', text: 'text-orange-800' },
+  PENDING: { bg: "bg-yellow-100", text: "text-yellow-700" },
+  CONFIRMED: { bg: "bg-sky-100", text: "text-sky-800" },
+  ACTIVE: { bg: "bg-blue-100", text: "text-blue-700" },
+  COMPLETED: { bg: "bg-green-100", text: "text-green-700" },
+  CANCELLED: { bg: "bg-gray-100", text: "text-gray-600" },
+  REJECTED: { bg: "bg-red-100", text: "text-red-700" },
+  OVERDUE: { bg: "bg-orange-100", text: "text-orange-800" },
 };
 
 type BookingRow = {
@@ -51,15 +51,19 @@ type BookingRow = {
 };
 
 function formatPrice(n: number) {
-  return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
 }
 
 function lensImage(b: BookingRow): string {
   const lens = b.items?.[0]?.lens;
-  if (!lens) return 'https://placehold.co/600x400/e2e8f0/64748b?text=Lens';
+  if (!lens) return "https://placehold.co/600x400/e2e8f0/64748b?text=Lens";
   if (lens.thumbnail) return lens.thumbnail;
   const img = lens.images?.[0];
-  return img?.image_url || img?.url || 'https://placehold.co/600x400/e2e8f0/64748b?text=Lens';
+  return (
+    img?.image_url ||
+    img?.url ||
+    "https://placehold.co/600x400/e2e8f0/64748b?text=Lens"
+  );
 }
 
 export default function BookingHistoryPage() {
@@ -88,7 +92,7 @@ export default function BookingHistoryPage() {
     for (const b of bookings) {
       const gid = b.booking_group_id || b.booking_group?.id;
       const gStatus = b.booking_group?.status;
-      if (gid && gStatus === 'PENDING' && vnpayOn) {
+      if (gid && gStatus === "PENDING" && vnpayOn) {
         ids.add(gid);
       }
     }
@@ -96,7 +100,7 @@ export default function BookingHistoryPage() {
   }, [bookings, vnpayOn]);
 
   const rangeLabel = useMemo(() => {
-    if (total === 0) return '';
+    if (total === 0) return "";
     const from = (page - 1) * PAGE_SIZE + 1;
     const to = Math.min(page * PAGE_SIZE, total);
     return `${from}–${to} / ${total} đơn`;
@@ -104,7 +108,7 @@ export default function BookingHistoryPage() {
 
   const load = useCallback(async () => {
     if (!getAuthToken()) {
-      setError('Vui lòng đăng nhập để xem lịch sử đơn thuê.');
+      setError("Vui lòng đăng nhập để xem lịch sử đơn thuê.");
       setBookings([]);
       setTotal(0);
       setTotalPages(1);
@@ -115,7 +119,7 @@ export default function BookingHistoryPage() {
     setError(null);
     try {
       const res = await bookingService.list({
-        role: 'renter',
+        role: "renter",
         status: filter,
         page,
         limit: PAGE_SIZE,
@@ -132,10 +136,13 @@ export default function BookingHistoryPage() {
       setTotalPages(Math.max(1, Number(body?.totalPages ?? 1)));
     } catch (e: unknown) {
       const msg =
-        e && typeof e === 'object' && 'response' in e
-          ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
           : undefined;
-      setError(msg || (e instanceof Error ? e.message : 'Không tải được danh sách'));
+      setError(
+        msg || (e instanceof Error ? e.message : "Không tải được danh sách"),
+      );
       setBookings([]);
       setTotal(0);
       setTotalPages(1);
@@ -150,15 +157,15 @@ export default function BookingHistoryPage() {
 
   const handlePageChange = (next: number) => {
     setPage(next);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const filters: { key?: string; label: string }[] = [
-    { key: undefined, label: 'Tất cả' },
-    { key: 'PENDING', label: 'Đang chờ' },
-    { key: 'CONFIRMED', label: 'Đã duyệt' },
-    { key: 'ACTIVE', label: 'Đang thuê' },
-    { key: 'COMPLETED', label: 'Hoàn tất' },
+    { key: undefined, label: "Tất cả" },
+    { key: "PENDING", label: "Đang chờ" },
+    { key: "CONFIRMED", label: "Đã duyệt" },
+    { key: "ACTIVE", label: "Đang thuê" },
+    { key: "COMPLETED", label: "Hoàn tất" },
   ];
 
   return (
@@ -170,7 +177,9 @@ export default function BookingHistoryPage() {
               LensLease VN
             </Link>
             <div className="hidden h-6 w-px bg-gray-200 md:block" />
-            <div className="hidden text-sm font-medium text-gray-500 md:block">Lịch sử đơn thuê</div>
+            <div className="hidden text-sm font-medium text-gray-500 md:block">
+              Lịch sử đơn thuê
+            </div>
           </div>
         </div>
       </header>
@@ -178,9 +187,12 @@ export default function BookingHistoryPage() {
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">Lịch sử đơn thuê</h1>
+            <h1 className="text-3xl font-extrabold text-gray-900">
+              Lịch sử đơn thuê
+            </h1>
             <p className="mt-2 text-sm text-gray-500">
-              Theo dõi các đơn bạn đã đặt — tải {PAGE_SIZE} đơn mỗi trang để tối ưu tốc độ.
+              Theo dõi các đơn bạn đã đặt — tải {PAGE_SIZE} đơn mỗi trang để tối
+              ưu tốc độ.
             </p>
           </div>
           <Link
@@ -200,8 +212,8 @@ export default function BookingHistoryPage() {
                 onClick={() => setFilter(f.key)}
                 className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
                   filter === f.key
-                    ? 'bg-[#0b45b3] text-white'
-                    : 'bg-white text-gray-600 shadow-sm hover:bg-gray-50'
+                    ? "bg-[#0b45b3] text-white"
+                    : "bg-white text-gray-600 shadow-sm hover:bg-gray-50"
                 }`}
               >
                 {f.label}
@@ -209,13 +221,15 @@ export default function BookingHistoryPage() {
             ))}
           </div>
           {!loading && total > 0 && (
-            <span className="text-sm font-medium text-gray-500">{rangeLabel}</span>
+            <span className="text-sm font-medium text-gray-500">
+              {rangeLabel}
+            </span>
           )}
         </div>
 
         {error && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {error}{' '}
+            {error}{" "}
             <Link to="/login" className="font-bold underline">
               Đăng nhập
             </Link>
@@ -242,9 +256,13 @@ export default function BookingHistoryPage() {
           </div>
         ) : total === 0 ? (
           <div className="rounded-3xl border border-dashed border-gray-300 bg-white py-20 text-center">
-            <h3 className="text-2xl font-bold text-gray-900">Chưa có đơn thuê</h3>
+            <h3 className="text-2xl font-bold text-gray-900">
+              Chưa có đơn thuê
+            </h3>
             <p className="mt-2 text-sm text-gray-500">
-              {filter ? 'Không có đơn nào với bộ lọc này.' : 'Hãy thêm thiết bị vào giỏ và thanh toán.'}
+              {filter
+                ? "Không có đơn nào với bộ lọc này."
+                : "Hãy thêm thiết bị vào giỏ và thanh toán."}
             </p>
             <Link
               to="/"
@@ -264,7 +282,7 @@ export default function BookingHistoryPage() {
                   const st = b.status;
                   const style = statusStyles[st] || statusStyles.PENDING;
                   const groupId = b.booking_group_id || b.booking_group?.id;
-                  const groupPending = b.booking_group?.status === 'PENDING';
+                  const groupPending = b.booking_group?.status === "PENDING";
                   const showGroupRetry =
                     vnpayOn &&
                     groupId &&
@@ -294,35 +312,39 @@ export default function BookingHistoryPage() {
                                 {STATUS_LABEL[st] || st}
                               </div>
                               <h2 className="mt-3 text-2xl font-bold text-gray-900">
-                                {lens?.title || 'Thiết bị'}
+                                {lens?.title || "Thiết bị"}
                               </h2>
                               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-500">
                                 <span>
-                                  Chủ thiết bị:{' '}
+                                  Chủ thiết bị:{" "}
                                   <span className="font-semibold text-[#0b45b3]">
-                                    {b.owner?.full_name || '—'}
+                                    {b.owner?.full_name || "—"}
                                   </span>
                                 </span>
                               </div>
                             </div>
                             <div className="rounded-2xl bg-gray-50 px-5 py-4 text-left md:min-w-[180px] md:text-right">
-                              <div className="text-xs font-medium text-gray-500">Tổng thanh toán</div>
+                              <div className="text-xs font-medium text-gray-500">
+                                Tổng thanh toán
+                              </div>
                               <div className="mt-1 text-2xl font-extrabold text-[#0b45b3]">
                                 {formatPrice(Number(b.total_price))}
                               </div>
                             </div>
                           </div>
                           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                            <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                            {new Date(b.start_date).toLocaleDateString('vi-VN')} —{' '}
-                            {new Date(b.end_date).toLocaleDateString('vi-VN')}
+                            <span className="material-symbols-outlined text-[18px]">
+                              calendar_month
+                            </span>
+                            {new Date(b.start_date).toLocaleDateString("vi-VN")}{" "}
+                            — {new Date(b.end_date).toLocaleDateString("vi-VN")}
                           </div>
                           {lensId && (
                             <div className="mt-4">
                               <LensRentalSchedulePanel
                                 lensId={lensId}
-                                startDate={String(b.start_date).split('T')[0]}
-                                endDate={String(b.end_date).split('T')[0]}
+                                startDate={String(b.start_date).split("T")[0]}
+                                endDate={String(b.end_date).split("T")[0]}
                                 quantity={Number(b.items?.[0]?.quantity) || 1}
                                 productDetailHref={`/products/${lensId}`}
                                 variant="compact"
@@ -336,10 +358,13 @@ export default function BookingHistoryPage() {
                               to={`/bookings/${b.id}`}
                               className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-5 py-3 font-semibold text-gray-700 transition hover:border-[#0b45b3] hover:bg-blue-50 hover:text-[#0b45b3]"
                             >
-                              Xem chi tiết & thao tác
+                              Xem chi tiết và Thao tác
                             </Link>
                             {showGroupRetry && groupId ? (
-                              <BookingGroupVnpayButton groupId={groupId} compact />
+                              <BookingGroupVnpayButton
+                                groupId={groupId}
+                                compact
+                              />
                             ) : null}
                           </div>
                         </div>

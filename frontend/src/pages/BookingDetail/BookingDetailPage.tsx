@@ -4,6 +4,7 @@ import LensRentalSchedulePanel from "../../components/scheduling/LensRentalSched
 import HandoverForm from "../../components/layout/HandoverForm";
 import { bookingService } from "../../services/booking.service";
 import { getAuthToken, getUserIdFromToken } from "../../utils/auth";
+import ProductReviewForm from "../../components/layout/ProductReviewForm"; // Component đánh giá số sao
 import {
   addDaysUtcYmd,
   ymdFromApiDateField,
@@ -58,7 +59,7 @@ export default function BookingDetailPage() {
     if (!id) return;
     if (!getAuthToken()) {
       setErr("Vui lòng đăng nhập.");
-      setLoading(false);
+      loading && setLoading(false);
       return;
     }
     setLoading(true);
@@ -171,11 +172,12 @@ export default function BookingDetailPage() {
               onClick={() => navigate(-1)}
               className="text-gray-600 hover:text-gray-900 text-sm font-medium"
             >
-              Quay lại
+              ← Quay lại
             </button>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Thông tin thiết bị */}
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4">
               <img
                 src={lensThumb(lens)}
@@ -203,7 +205,7 @@ export default function BookingDetailPage() {
             </div>
 
             {lensId && startYmd && endYmd && (
-              <div className="px-6 pb-6">
+              <div className="px-6 pb-6 mt-4">
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
                   Lịch trống &amp; đặt lại
                 </h3>
@@ -220,6 +222,7 @@ export default function BookingDetailPage() {
               </div>
             )}
 
+            {/* Chi tiết thông tin hóa đơn */}
             <div className="p-6 space-y-3 text-sm border-b border-gray-100">
               <div className="flex justify-between">
                 <span className="text-gray-500">Người thuê</span>
@@ -255,6 +258,14 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
+            {/* KHU VỰC ĐÁNH GIÁ SẢN PHẨM (Chỉ hiện khi Đơn hoàn thành COMPLETED và người xem là Người thuê Renter) */}
+            {st === "COMPLETED" && isRenter && lensId && (
+              <div className="p-6 bg-gray-50 border-b border-gray-100">
+                <ProductReviewForm bookingId={booking.id} lensId={lensId} />
+              </div>
+            )}
+
+            {/* Các Action Button điều hướng cho Chủ máy */}
             {isOwner && (
               <div className="p-6 space-y-4 bg-gray-50/80 border-t border-gray-100">
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
@@ -386,6 +397,7 @@ export default function BookingDetailPage() {
               </div>
             )}
 
+            {/* Các Action Button điều hướng cho Người thuê */}
             {isRenter && (
               <div className="p-6 space-y-4 border-t border-gray-100">
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">

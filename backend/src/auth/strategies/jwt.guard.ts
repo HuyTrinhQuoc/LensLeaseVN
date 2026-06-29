@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
@@ -15,7 +20,13 @@ export class JwtGuard implements CanActivate {
 
     try {
       const payload = this.jwtService.verify(token);
-      // Map userId from token payload to request.user.id for consistency
+      const resolvedUserId = payload.id || payload.userId || payload.sub;
+
+      if (!resolvedUserId) {
+        throw new UnauthorizedException(
+          'Token payload không chứa ID người dùng hợp lệ',
+        );
+      }
       request.user = {
         id: payload.userId,
         userId: payload.userId,
