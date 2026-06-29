@@ -19,6 +19,7 @@ import { HandoverModule } from './modules/handover/handover.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { EkycModule } from './modules/ekyc/ekyc.module';
 import { OwnerApplicationsModule } from './modules/owner-applications/owner-applications.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { OwnerApplicationsModule } from './modules/owner-applications/owner-appl
     BookingsModule,
     WalletModule,
     PaymentsModule,
+    ReviewsModule,
     ChatModule,
     AdminUserModule,
     AdminFinanceModule,
