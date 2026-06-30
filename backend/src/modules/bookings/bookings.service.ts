@@ -845,6 +845,7 @@ export class BookingsService {
         disputes: true,
         reviews: true,
         transactions: true,
+        handoverReport: true,
       },
     });
 
@@ -1551,6 +1552,7 @@ export class BookingsService {
       items: { include: { lens: { include: { images: true } } } },
       owner: { select: { id: true, full_name: true, phone: true } },
       user: { select: { id: true, full_name: true, phone: true } },
+      handoverReport: true,
     };
   }
 

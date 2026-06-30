@@ -52,6 +52,8 @@ export default function BookingDetailPage() {
   const [busy, setBusy] = useState(false);
   const [extendDate, setExtendDate] = useState("");
   const [showHandover, setShowHandover] = useState(false);
+  const [handoverMode, setHandoverMode] = useState<"checkin" | "checkout">("checkin");
+  const [handoverViewOnly, setHandoverViewOnly] = useState(false);
 
   const selfId = getUserIdFromToken();
 
@@ -96,8 +98,7 @@ export default function BookingDetailPage() {
       if (msg) {
         let prodMsg = msg;
         if (msg.includes("Đã duyệt đơn")) {
-          prodMsg =
-            "Phê duyệt đơn đặt thuê thành công! Hệ thống đã khấu trừ số dư tài khoản người thuê.";
+          prodMsg = "Phê duyệt đơn đặt thuê thành công! Hệ thống đã khấu trừ số dư tài khoản người thuê.";
         } else if (msg.includes("Đã gửi xác nhận trả máy")) {
           prodMsg = "Đã gửi xác nhận hoàn trả thiết bị thành công.";
         } else if (msg.includes("Đã hủy đơn")) {
@@ -116,9 +117,7 @@ export default function BookingDetailPage() {
       await load();
     } catch (e: any) {
       toast.dismiss(loadingId);
-      toast.error(
-        e.response?.data?.message || e.message || "Thao tác thất bại",
-      );
+      toast.error(e.response?.data?.message || e.message || "Thao tác thất bại");
     } finally {
       setBusy(false);
     }
@@ -148,6 +147,9 @@ export default function BookingDetailPage() {
       <div className="min-h-screen bg-[#f4f7fa] py-8 px-4">
         <HandoverForm
           bookingData={booking}
+          mode={handoverMode}
+          viewOnly={handoverViewOnly}
+          currentUserId={selfId}
           onCancel={() => setShowHandover(false)}
           onSuccess={() => {
             setShowHandover(false);
@@ -163,6 +165,12 @@ export default function BookingDetailPage() {
   const st = booking.status as string;
   const startYmd = String(booking.start_date || "").split("T")[0];
   const endYmd = String(booking.end_date || "").split("T")[0];
+
+  const handoverData = booking.handoverReport || booking.handover_report || booking.handover;
+
+  const isCheckInOwnerSigned = !!handoverData?.owner_signature_checkin || !!handoverData?.signature_a;
+  const isCheckInRenterSigned = !!handoverData?.renter_signature_checkin || !!handoverData?.signature_b;
+  const isCheckOutOwnerSigned = !!handoverData?.owner_signature_checkout || !!handoverData?.signature_checkout;
 
   return (
     <>
@@ -201,8 +209,7 @@ export default function BookingDetailPage() {
                   </span>
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
-                  {formatDate(booking.start_date)} →{" "}
-                  {formatDate(booking.end_date)}
+                  {formatDate(booking.start_date)} → {formatDate(booking.end_date)}
                 </p>
               </div>
             </div>
@@ -225,39 +232,90 @@ export default function BookingDetailPage() {
               </div>
             )}
 
+            {/* Khối giám sát quy trình xác nhận chữ ký số */}
+            {(st === "CONFIRMED" || st === "ACTIVE" || st === "COMPLETED") && (
+              <div className="p-6 bg-blue-50/40 border-b border-gray-100 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-gray-600">
+                  Tiến độ ký kết Biên bản bàn giao pháp lý
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {/* Giai đoạn nhận máy */}
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <p className="font-bold text-gray-700 mb-2">1. Giai đoạn bàn giao (Check-in)</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Chủ máy ký:</span>
+                        {isCheckInOwnerSigned ? (
+                          <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-sm">✓ Đã ký</span>
+                        ) : (
+                          <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-sm">○ Chờ ký</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Người thuê ký:</span>
+                        {isCheckInRenterSigned ? (
+                          <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-sm">✓ Đã ký</span>
+                        ) : (
+                          <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-sm">○ Chờ ký</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Giai đoạn hoàn trả */}
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <p className="font-bold text-gray-700 mb-2">2. Giai đoạn hoàn trả (Check-out)</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Người thuê đem trả máy:</span>
+                        {booking.renter_returned ? (
+                          <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-sm">✓ Đã trả</span>
+                        ) : (
+                          <span className="text-gray-400 bg-gray-50 px-2 py-0.5 rounded-sm">○ Chưa trả</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Chủ máy nghiệm thu &amp; ký:</span>
+                        {isCheckOutOwnerSigned ? (
+                          <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-sm">✓ Đã ký đóng đơn</span>
+                        ) : (
+                          <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-sm">○ Chờ ký</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-gray-500 italic">
+                  * Lưu ý: Biên bản bàn giao 3 bước có giá trị pháp lý làm đối chứng tình trạng trầy xước/hỏng hóc khi hoàn trả tài sản và quyết định giải ngân hoàn cọc ký quỹ.
+                </p>
+              </div>
+            )}
+
             {/* Chi tiết thông tin hóa đơn */}
             <div className="p-6 space-y-3 text-sm border-b border-gray-100">
               <div className="flex justify-between">
                 <span className="text-gray-500">Người thuê</span>
-                <span className="font-medium">
-                  {booking.user?.full_name || "—"}
-                </span>
+                <span className="font-medium">{booking.user?.full_name || "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Chủ máy</span>
-                <span className="font-medium">
-                  {booking.owner?.full_name || "—"}
-                </span>
+                <span className="font-medium">{booking.owner?.full_name || "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Tổng thanh toán</span>
-                <span className="font-extrabold text-[#0b45b3]">
-                  {formatMoney(Number(booking.total_price))}
-                </span>
+                <span className="font-extrabold text-[#0b45b3]">{formatMoney(Number(booking.total_price))}</span>
               </div>
               {booking.deposit_amount != null && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Ký quỹ</span>
-                  <span className="font-medium">
-                    {formatMoney(Number(booking.deposit_amount))}
-                  </span>
+                  <span className="font-medium">{formatMoney(Number(booking.deposit_amount))}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Loại cọc</span>
-                <span className="font-medium">
-                  {booking.selected_deposit_type}
-                </span>
+                <span className="font-medium">{booking.selected_deposit_type}</span>
               </div>
             </div>
 
@@ -273,15 +331,12 @@ export default function BookingDetailPage() {
                     />
                   </div>
                 )}
-
                 {isOwner && booking.user_id && (
                   <div className="p-6 bg-amber-50/40 border-b border-gray-100">
                     <ProductReviewForm
                       bookingId={booking.id}
                       reviewedUserId={booking.user_id}
-                      targetName={
-                        booking.user?.full_name || "Khách thuê ẩn danh"
-                      }
+                      targetName={booking.user?.full_name || "Khách thuê ẩn danh"}
                     />
                   </div>
                 )}
@@ -291,9 +346,7 @@ export default function BookingDetailPage() {
             {/* Các Action Button điều hướng cho Chủ máy */}
             {isOwner && (
               <div className="p-6 space-y-4 bg-gray-50/80 border-t border-gray-100">
-                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
-                  Chủ máy
-                </h3>
+                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Chủ máy</h3>
                 <div className="flex flex-wrap gap-2">
                   {st === "PENDING" && (
                     <>
@@ -351,29 +404,49 @@ export default function BookingDetailPage() {
                       </button>
                     </>
                   )}
+                  
                   {st === "CONFIRMED" && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setShowHandover(true)}
-                      className="rounded-xl bg-[#0b45b3] px-5 py-2.5 text-white text-sm font-semibold disabled:opacity-50 hover:bg-blue-700 transition"
-                    >
-                      Tiến hành bàn giao máy (Check-in)
-                    </button>
+                    <div className="w-full flex flex-col gap-2">
+                      {!isCheckInOwnerSigned ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            setHandoverMode("checkin");
+                            setHandoverViewOnly(false); 
+                            setShowHandover(true);
+                          }}
+                          className="rounded-xl bg-[#0b45b3] px-5 py-2.5 text-white text-sm font-semibold disabled:opacity-50 hover:bg-blue-700 transition shadow-md"
+                        >
+                          Lập Biên Bản &amp; Ký Giao Máy (Bên A)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="rounded-xl bg-amber-500 px-5 py-2.5 text-white text-sm font-semibold transition opacity-80 cursor-not-allowed"
+                        >
+                          Bạn đã ký giao máy — Đang chờ Người thuê ký nhận...
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {st === "ACTIVE" && !booking.renter_returned && (
                     <div className="w-full space-y-2">
                       <span className="text-sm text-gray-500 italic block py-2.5 bg-white px-3 border border-gray-200 rounded-xl">
-                        Hệ thống đang đợi người thuê bấm nút xác nhận "Tôi đã
-                        hoàn trả thiết bị" trên ứng dụng...
+                        Hệ thống đang đợi người thuê bấm nút xác nhận "Tôi đã hoàn trả thiết bị" để mở cổng nghiệm thu trả cọc...
                       </span>
                       <button
                         type="button"
-                        onClick={() => setShowHandover(true)}
+                        onClick={() => {
+                          setHandoverMode("checkin");
+                          setHandoverViewOnly(true);
+                          setShowHandover(true);
+                        }}
                         className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition"
                       >
-                        Xem hoặc cập nhật biên bản bàn giao
+                        Xem lại biên bản bàn giao lúc Check-in
                       </button>
                     </div>
                   )}
@@ -382,10 +455,14 @@ export default function BookingDetailPage() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => setShowHandover(true)}
-                      className="w-full sm:w-auto rounded-xl bg-emerald-700 px-5 py-2.5 text-white text-sm font-semibold disabled:opacity-50 hover:bg-emerald-800 transition"
+                      onClick={() => {
+                        setHandoverMode("checkout");
+                        setHandoverViewOnly(false);
+                        setShowHandover(true);
+                      }}
+                      className="w-full sm:w-auto rounded-xl bg-red-600 px-5 py-2.5 text-white text-sm font-semibold disabled:opacity-50 hover:bg-red-700 transition shadow-lg animate-bounce"
                     >
-                      Kiểm tra máy &amp; Đóng đơn (Check-out)
+                      Nghiệm thu máy &amp; Ký đóng đơn (Check-out)
                     </button>
                   )}
 
@@ -427,9 +504,7 @@ export default function BookingDetailPage() {
             {/* Các Action Button điều hướng cho Người thuê */}
             {isRenter && (
               <div className="p-6 space-y-4 border-t border-gray-100">
-                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
-                  Người thuê
-                </h3>
+                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Người thuê</h3>
 
                 {st === "PENDING" && (
                   <button
@@ -473,8 +548,51 @@ export default function BookingDetailPage() {
                   </button>
                 )}
 
+                {st === "CONFIRMED" && (
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-2">
+                    {!isCheckInOwnerSigned ? (
+                      <>
+                        <p className="text-xs text-amber-800">
+                          Chủ máy đang chuẩn bị thiết bị và lập biên bản bàn giao. Vui lòng chờ Chủ máy ký xác nhận giao máy trước.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-amber-800 font-bold">
+                          Chủ máy đã ký biên bản giao. Mời bạn kiểm tra thực tế thiết bị và vẽ chữ ký điện tử để nhận máy.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHandoverMode("checkin");
+                            setHandoverViewOnly(false);
+                            setShowHandover(true);
+                          }}
+                          className="rounded-xl bg-amber-600 text-white font-bold text-xs px-4 py-2.5 hover:bg-amber-700 transition shadow-sm"
+                        >
+                          Xem &amp; Ký Biên Bản Nhận Máy (Bên B)
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {st === "ACTIVE" && (
                   <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHandoverMode("checkin");
+                          setHandoverViewOnly(true);
+                          setShowHandover(true);
+                        }}
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition"
+                      >
+                        Xem biên bản Check-in đã ký
+                      </button>
+                    </div>
+
                     {!booking.renter_returned ? (
                       <button
                         type="button"
@@ -484,18 +602,14 @@ export default function BookingDetailPage() {
                             (t) => (
                               <div className="flex flex-col gap-3 p-1">
                                 <p className="text-sm font-semibold text-gray-800 text-center">
-                                  Bạn xác nhận đã đem thiết bị đi trả cho chủ
-                                  máy?
+                                  Bạn xác nhận đã đem thiết bị đi trả cho chủ máy?
                                 </p>
                                 <div className="flex justify-center gap-2">
                                   <button
                                     onClick={() => {
                                       toast.dismiss(t.id);
                                       void run(
-                                        () =>
-                                          bookingService.renterReturn(
-                                            booking.id,
-                                          ),
+                                        () => bookingService.renterReturn(booking.id),
                                         "Đã gửi xác nhận trả máy.",
                                       );
                                     }}
@@ -520,9 +634,11 @@ export default function BookingDetailPage() {
                         Tôi đã hoàn trả thiết bị
                       </button>
                     ) : (
-                      <div className="text-sm text-green-700 bg-green-50 p-3 rounded-xl border border-green-200">
-                        Bạn đã bấm xác nhận hoàn trả thiết bị. Vui lòng chờ chủ
-                        máy nhận máy và đóng đơn.
+                      <div className="text-sm text-green-700 bg-green-50 p-4 rounded-xl border border-green-200 space-y-2">
+                        <p className="font-bold">✓ Đã gửi thông báo hoàn trả máy.</p>
+                        <p className="text-xs text-gray-600">
+                          Vui lòng bàn giao thiết bị trực tiếp cho chủ máy để họ nghiệm thu ngoại hình và ký đóng đơn (Check-out) trên hệ thống.
+                        </p>
                       </div>
                     )}
 
@@ -569,8 +685,7 @@ export default function BookingDetailPage() {
 
             {!isRenter && !isOwner && (
               <div className="p-6 text-sm text-amber-800 bg-amber-50">
-                Bạn không phải người thuê hay chủ máy của đơn này (hoặc token
-                không khớp).
+                Bạn không phải người thuê hay chủ máy của đơn này (hoặc token không khớp).
               </div>
             )}
           </div>

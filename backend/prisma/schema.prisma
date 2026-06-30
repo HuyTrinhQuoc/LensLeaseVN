@@ -267,6 +267,8 @@ model HandoverReport {
   images_checkin  String[] 
   signature_a     String?  
   signature_b     String?  
+
+  signature_checkout String?
   
   // Dữ liệu lúc Nhận lại máy 
   note_checkout   String?
