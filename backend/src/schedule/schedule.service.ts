@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -65,5 +65,36 @@ export class DeviceScheduleService {
     ];
 
     return events;
+  }
+  // 3. Thực hiện khóa lịch (Owner tự khóa)
+async blockDates(lensId: string, data: { start_date: string, end_date: string, reason: string }) {
+    const start = new Date(data.start_date);
+    const end = new Date(data.end_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Đưa về đầu ngày hiện tại để so sánh
+
+    // Validate: Không cho khóa ngày trong quá khứ
+    if (start < today) {
+      throw new BadRequestException('Không thể khóa thiết bị vào ngày trong quá khứ!');
+    }
+    if (end < start) {
+      throw new BadRequestException('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!');
+    }
+
+    return this.prisma.blockedDate.create({
+      data: {
+        lens_id: lensId,
+        start_date: start,
+        end_date: end,
+        reason: data.reason || 'Owner khóa lịch',
+      }
+    });
+  }
+
+  // 4. MỚI: Mở khóa lịch
+  async unblockDate(blockId: string) {
+    return this.prisma.blockedDate.delete({
+      where: { id: blockId }
+    });
   }
 }
