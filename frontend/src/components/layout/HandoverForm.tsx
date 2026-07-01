@@ -1,32 +1,84 @@
-import { useState } from 'react';
-import { handoverService } from '../../services/handover.service';
-import toast, { Toaster } from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { handoverService } from "../../services/handover.service";
+import toast, { Toaster } from "react-hot-toast";
+import SignatureCanvas from "./SignatureCanvas";
 
 interface HandoverFormProps {
   bookingData: any;
+  currentUserId: string | number;
+  mode?: "checkin" | "checkout";
+  viewOnly?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export default function HandoverForm({ bookingData, onSuccess, onCancel }: HandoverFormProps) {
+export default function HandoverForm({
+  bookingData,
+  currentUserId,
+  mode,
+  viewOnly = false,
+  onSuccess,
+  onCancel,
+}: HandoverFormProps) {
   const [agreed, setAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const [noteCheckin, setNoteCheckin] = useState('');
+  const [noteCheckin, setNoteCheckin] = useState("");
   const [imagesCheckin, setImagesCheckin] = useState<string[]>([]);
 
-  const [noteCheckout, setNoteCheckout] = useState('');
+  const [noteCheckout, setNoteCheckout] = useState("");
   const [imagesCheckout, setImagesCheckout] = useState<string[]>([]);
   const [isDamaged, setIsDamaged] = useState(false);
+
+  const [signatureA, setSignatureA] = useState<string | null>(null);
+  const [signatureB, setSignatureB] = useState<string | null>(null);
+  const [signatureCheckout, setSignatureCheckout] = useState<string | null>(
+    null,
+  );
 
   const bookingId = bookingData?.id;
   const status = bookingData?.status;
   const renter = bookingData?.user;
   const owner = bookingData?.owner;
   const bookingItems = bookingData?.items || [];
+  const handoverReport =
+    bookingData?.handoverReport ||
+    bookingData?.handover_report ||
+    bookingData?.handover;
 
-  const isCheckOutMode = status === 'ACTIVE';
+  // Xác định chế độ dựa trên prop mode truyền từ trang cha hoặc trạng thái ACTIVE của đơn hàng
+  const isCheckOutMode = mode ? mode === "checkout" : status === "ACTIVE";
+
+  // Chuẩn hóa chuỗi so sánh ID tài khoản tránh lỗi lệch kiểu dữ liệu UUID/String
+  const cleanUserId = String(currentUserId || "")
+    .trim()
+    .toLowerCase();
+  const cleanOwnerId = String(owner?.id || bookingData?.owner_id || "")
+    .trim()
+    .toLowerCase();
+  const cleanRenterId = String(renter?.id || bookingData?.user_id || "")
+    .trim()
+    .toLowerCase();
+
+  const isOwner = cleanOwnerId ? cleanUserId === cleanOwnerId : false;
+  const isRenter = cleanRenterId ? cleanUserId === cleanRenterId : false;
+
+  // Đồng bộ dữ liệu cũ từ Database đổ vào state cục bộ để hiển thị
+  useEffect(() => {
+    if (handoverReport) {
+      if (handoverReport.note_checkin)
+        setNoteCheckin(handoverReport.note_checkin);
+      if (handoverReport.images_checkin)
+        setImagesCheckin(handoverReport.images_checkin);
+      if (handoverReport.note_checkout)
+        setNoteCheckout(handoverReport.note_checkout);
+      if (handoverReport.images_checkout)
+        setImagesCheckout(handoverReport.images_checkout);
+      if (typeof handoverReport.is_damaged === "boolean")
+        setIsDamaged(handoverReport.is_damaged);
+    }
+  }, [handoverReport]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -47,29 +99,23 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
 
         const res = await fetch(
           `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
+          { method: "POST", body: formData },
         );
 
         const data = await res.json();
         if (data.secure_url) {
           newUrls.push(data.secure_url);
-        } else {
-          console.error("Lỗi từ Cloudinary API:", data);
         }
       }
 
       if (isCheckOutMode) {
-        setImagesCheckout(prev => [...prev, ...newUrls]);
+        setImagesCheckout((prev) => [...prev, ...newUrls]);
       } else {
-        setImagesCheckin(prev => [...prev, ...newUrls]);
+        setImagesCheckin((prev) => [...prev, ...newUrls]);
       }
-
     } catch (error) {
-      console.error('Lỗi kết nối upload Cloudinary:', error);
-      alert('Không thể tải ảnh lên đám mây, vui lòng thử lại!');
+      console.error(error);
+      toast.error("Lỗi tải tệp ảnh minh chứng lên hệ thống Cloudinary!");
     } finally {
       setUploading(false);
     }
@@ -85,261 +131,514 @@ export default function HandoverForm({ bookingData, onSuccess, onCancel }: Hando
 
   const handleSubmit = async () => {
     if (!agreed) return;
-    const loadingToast = toast.loading('Đang xử lý biên bản trên hệ thống...');
+
+    // RÀNG BUỘC PHÁP LÝ CHỮ KÝ CHẶT CHẼ THEO ĐÚNG 3 BƯỚC TUẦN TỰ
+    if (!isCheckOutMode) {
+      // Giai đoạn giao máy Check-in
+      if (isOwner && !handoverReport?.signature_a && !signatureA) {
+        toast.error("Vui lòng vẽ ký xác nhận ở mục Bên A trước khi bàn giao!");
+        return;
+      }
+      if (
+        isRenter &&
+        handoverReport?.signature_a &&
+        !handoverReport?.signature_b &&
+        !signatureB
+      ) {
+        toast.error(
+          "Vui lòng vẽ ký nhận máy ở mục Bên B để kích hoạt đơn hàng!",
+        );
+        return;
+      }
+    } else {
+      // Giai đoạn thu hồi máy Check-out (Chỉ cần duy nhất Owner ký nghiệm thu tài sản)
+      if (
+        isOwner &&
+        !handoverReport?.signature_checkout &&
+        !signatureCheckout
+      ) {
+        toast.error(
+          "Vui lòng vẽ ký xác nhận thu hồi thiết bị ở ô Chữ ký Check-out!",
+        );
+        return;
+      }
+    }
+
+    const loadingToast = toast.loading(
+      "Hệ thống đang lưu trữ dữ liệu và trạng thái biên bản...",
+    );
     try {
       setIsSubmitting(true);
 
       if (isCheckOutMode) {
+        // Gửi dữ liệu đóng đơn mốc Check-out
         await handoverService.processCheckOut(bookingId, {
           note_checkout: noteCheckout,
           images_checkout: imagesCheckout,
-          is_damaged: isDamaged
+          is_damaged: isDamaged,
+          signature_checkout:
+            signatureCheckout || handoverReport?.signature_checkout || null,
         });
         toast.dismiss(loadingToast);
-        toast.success('Xác nhận trả thiết bị thành công! Đơn hàng đã hoàn tất.');
+        toast.success(
+          "Nghiệm thu đóng đơn thành công! Trạng thái đơn đổi sang COMPLETED.",
+        );
       } else {
+        // Gửi dữ liệu ký mốc Check-in
         await handoverService.processCheckIn(bookingId, {
-          note_checkin: noteCheckin,
+          note_checkin: noteCheckin || "",
           images_checkin: imagesCheckin,
-          signature_a: "SIGNED_BY_OWNER_MOCK_DATA",
-          signature_b: "SIGNED_BY_RENTER_MOCK_DATA"
+          signature_a: signatureA || handoverReport?.signature_a || null,
+          signature_b: signatureB || handoverReport?.signature_b || null,
         });
         toast.dismiss(loadingToast);
-        toast.success('Lập biên bản thành công! Thiết bị đã được bàn giao cho người thuê.');
+
+        if (isOwner && !handoverReport?.signature_a) {
+          toast.success(
+            "Đã lưu chữ ký Bên A, vui lòng nhắn Người thuê ký xác nhận.",
+          );
+        } else {
+          toast.success(
+            "Đơn hàng đã chính thức kích hoạt hoạt động.",
+          );
+        }
       }
 
       if (onSuccess) onSuccess();
     } catch (error: any) {
       toast.dismiss(loadingToast);
       console.error(error);
-      const errorMsg = error?.response?.data?.message || 'Có lỗi xảy ra khi xử lý biên bản, vui lòng thử lại.';
-      toast.error(errorMsg);
+      toast.error(
+        error?.response?.data?.message ||
+          "Lưu thông tin biên bản bàn giao thất bại.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Các biến kiểm tra trạng thái chữ ký cũ để khóa input tương ứng
+  const hasOwnerSignedCheckIn = !!handoverReport?.signature_a;
+
   return (
     <>
-    <Toaster position="top-center" reverseOrder={false} />
-    <div className="max-w-4xl mx-auto my-8 bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/20 overflow-hidden">
-      
-      <div className={`${isCheckOutMode ? 'bg-error/5 border-error/10' : 'bg-primary/5 border-primary/10'} border-b p-8 flex justify-between items-center`}>
-        <div>
-          <h2 className={`text-2xl font-extrabold tracking-tight mb-1 ${isCheckOutMode ? 'text-error' : 'text-primary'}`}>
-            {isCheckOutMode ? 'Biên Bản Nhận Lại Thiết Bị (Check-out)' : 'Biên Bản Bàn Giao Thiết Bị (Check-in)'}
-          </h2>
-          <p className="text-on-surface-variant text-sm font-medium">Mã đơn: <span className="font-bold text-on-surface">#{String(bookingId).slice(0, 8).toUpperCase()}</span></p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-bold text-on-surface">
-            {isCheckOutMode 
-              ? (bookingData?.end_date ? new Date(bookingData.end_date).toLocaleDateString('vi-VN') : '---')
-              : (bookingData?.start_date ? new Date(bookingData.start_date).toLocaleDateString('vi-VN') : '---')
-            }
-          </p>
-          <p className="text-xs text-on-surface-variant">{isCheckOutMode ? 'Ngày trả máy' : 'Ngày nhận máy'}</p>
-        </div>
-      </div>
-
-      <div className="p-8 space-y-8">
-        
-        <div className="grid grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <h3 className="font-bold text-sm text-outline uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">storefront</span> Bên A (Bên Cho Thuê)
-            </h3>
-            <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2 text-sm">
-              <p><span className="text-on-surface-variant w-24 inline-block">Họ Tên:</span> <span className="font-bold">{owner?.full_name || 'Chưa cập nhật'}</span></p>
-              <p><span className="text-on-surface-variant w-24 inline-block">Số ĐT:</span> <span className="font-medium">{owner?.phone || '---'}</span></p>
-              <p><span className="text-on-surface-variant w-24 inline-block">Địa chỉ:</span> <span className="font-medium">{owner?.address || '---'}</span></p>
-            </div>
+      <Toaster position="top-center" reverseOrder={false} />
+      <div className="max-w-4xl mx-auto my-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* HEADER BIÊN BẢN */}
+        <div
+          className={`${isCheckOutMode ? "bg-red-50 border-red-100" : "bg-blue-50 border-blue-100"} border-b p-8 flex justify-between items-center`}
+        >
+          <div>
+            <h2
+              className={`text-xl font-extrabold tracking-tight mb-1 ${isCheckOutMode ? "text-red-700" : "text-[#0b45b3]"}`}
+            >
+              {isCheckOutMode
+                ? "Biên Bản Nghiệm Thu & Nhận Lại Thiết Bị (Check-out)"
+                : "Biên Bản Kiểm Tra & Bàn Giao Thiết Bị (Check-in)"}
+            </h2>
+            <p className="text-gray-500 text-sm font-medium">
+              Mã đơn hàng:{" "}
+              <span className="font-mono font-bold text-gray-800">
+                #{String(bookingId).slice(0, 8).toUpperCase()}
+              </span>
+            </p>
           </div>
-          
-          <div className="space-y-4">
-            <h3 className="font-bold text-sm text-outline uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">person</span> Bên B (Bên Thuê)
-            </h3>
-            <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2 text-sm">
-              <p><span className="text-on-surface-variant w-24 inline-block">Họ Tên:</span> <span className="font-bold">{renter?.full_name || 'Chưa cập nhật'}</span></p>
-              <p><span className="text-on-surface-variant w-24 inline-block">Số ĐT:</span> <span className="font-medium">{renter?.phone || '---'}</span></p>
-            </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-gray-800">
+              {isCheckOutMode
+                ? bookingData?.end_date
+                  ? new Date(bookingData.end_date).toLocaleDateString("vi-VN")
+                  : "---"
+                : bookingData?.start_date
+                  ? new Date(bookingData.start_date).toLocaleDateString("vi-VN")
+                  : "---"}
+            </p>
+            <p className="text-xs text-gray-400">
+              {isCheckOutMode ? "Ngày thu hồi máy" : "Ngày bàn giao máy"}
+            </p>
           </div>
         </div>
 
-        <hr className="border-outline-variant/20" />
-
-        <div className="space-y-4">
-          <h3 className="font-bold text-sm text-outline uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">photo_camera</span> 
-            {isCheckOutMode ? 'Kiểm Tra Tình Trạng Thu Hồi Máy' : 'Kiểm Tra Thiết Bị Bàn Giao'}
-          </h3>
-          
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-7 space-y-3">
-              {bookingItems.map((item: any, idx: number) => (
-                <div key={item.id || idx} className="flex items-center justify-between p-3 rounded-lg border border-outline-variant/30 hover:bg-surface-container transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary rounded cursor-pointer" />
-                    <span className="font-medium">{item.lens?.title || 'Thiết bị công nghệ'}</span>
-                  </div>
-                  <span className="text-xs font-mono bg-surface-container-high px-2 py-1 rounded text-on-surface-variant">SL: {item.quantity}</span>
-                </div>
-              ))}
-              {bookingItems.length === 0 && <p className="text-sm text-outline">Không có thiết bị nào trong đơn đặt</p>}
-
-              {isCheckOutMode && (
-                <div className={`p-4 rounded-xl border mt-4 flex items-center justify-between ${isDamaged ? 'bg-error/10 border-error/30' : 'bg-surface-container border-outline-variant/20'}`}>
-                  <div>
-                    <p className="text-sm font-bold text-on-surface">Phát hiện lỗi / Hư hại / Trầy xước mới?</p>
-                    <p className="text-xs text-on-surface-variant">Tích vào ô bên cạnh nếu thiết bị phát sinh lỗi cần xử lý bồi thường.</p>
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    checked={isDamaged} 
-                    onChange={(e) => setIsDamaged(e.target.checked)} 
-                    className="w-6 h-6 accent-error rounded cursor-pointer"
-                  />
-                </div>
-              )}
+        <div className="p-8 space-y-8">
+          {/* THÔNG TIN HAI BÊN THAM GIA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <h3 className="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                Bên A (Bên Cho Thuê / Chủ máy)
+              </h3>
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 space-y-2 text-sm">
+                <p>
+                  <span className="text-gray-400 w-20 inline-block">
+                    Họ Tên:
+                  </span>{" "}
+                  <span className="font-bold text-gray-800">
+                    {owner?.full_name || "Chưa cập nhật"}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-gray-400 w-20 inline-block">
+                    Số ĐT:
+                  </span>{" "}
+                  <span className="font-medium text-gray-700">
+                    {owner?.phone || "---"}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-gray-400 w-20 inline-block">
+                    Địa chỉ:
+                  </span>{" "}
+                  <span className="font-medium text-gray-700">
+                    {owner?.address || "---"}
+                  </span>
+                </p>
+              </div>
             </div>
 
-            <div className="col-span-5 space-y-4">
-              <textarea 
-                value={isCheckOutMode ? noteCheckout : noteCheckin}
-                onChange={(e) => isCheckOutMode ? setNoteCheckout(e.target.value) : setNoteCheckin(e.target.value)}
-                placeholder={isCheckOutMode 
-                  ? "Nhập tình trạng khi nhận lại (Ví dụ: Máy hoạt động tốt, đã hoàn trả đầy đủ phụ kiện...)" 
-                  : "Ghi chú thêm về ngoại hình (VD: Xước dăm đáy máy, có bụi ở kính trước lens...)"
-                } 
-                className="w-full h-24 p-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
-              ></textarea>
-              
-              <input 
-                type="file" 
-                id="handover-image-upload"
-                accept="image/*"
-                multiple
-                className="hidden" 
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-              
-              <label 
-                htmlFor="handover-image-upload"
-                className={`w-full py-2.5 border-2 border-dashed border-outline-variant/50 rounded-lg font-bold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {uploading ? 'hourglass_empty' : 'add_a_photo'}
-                </span>
-                {uploading ? 'Đang tải ảnh...' : `Tải ảnh minh chứng (${isCheckOutMode ? imagesCheckout.length : imagesCheckin.length} ảnh)`}
-              </label>
+            <div className="space-y-3">
+              <h3 className="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                Bên B (Bên Thuê / Khách hàng)
+              </h3>
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 space-y-2 text-sm">
+                <p>
+                  <span className="text-gray-400 w-20 inline-block">
+                    Họ Tên:
+                  </span>{" "}
+                  <span className="font-bold text-gray-800">
+                    {renter?.full_name || "Chưa cập nhật"}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-gray-400 w-20 inline-block">
+                    Số ĐT:
+                  </span>{" "}
+                  <span className="font-medium text-gray-700">
+                    {renter?.phone || "---"}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {(isCheckOutMode ? imagesCheckout : imagesCheckin).map((url, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-outline-variant/30 bg-surface-container group">
-                    <img src={url} alt={`Evidence ${index}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(index)}
-                      className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <span className="material-symbols-outlined text-xs block">close</span>
-                    </button>
+          <hr className="border-gray-100" />
+
+          {/* KIỂM TRA THIẾT BỊ, HÌNH ẢNH MINH CHỨNG & NOTE */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              Danh mục tài sản bàn giao nghiệm thu
+            </h3>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Danh sách sản phẩm của đơn hàng */}
+              <div className="lg:col-span-6 space-y-3">
+                {bookingItems.map((item: any, idx: number) => (
+                  <div
+                    key={item.id || idx}
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-200 bg-white shadow-2xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        defaultChecked
+                        disabled
+                        className="w-5 h-5 accent-emerald-600 rounded cursor-not-allowed"
+                      />
+                      <span className="font-semibold text-sm text-gray-800">
+                        {item.lens?.title || "Thiết bị cho thuê"}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">
+                      SL: {item.quantity}
+                    </span>
                   </div>
                 ))}
+
+                {/* Khối check hư hỏng phát sinh mốc Check-out */}
+                {isCheckOutMode && (
+                  <div
+                    className={`p-4 rounded-xl border mt-4 flex items-center justify-between ${isDamaged ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-red-700">
+                        Phát hiện thiết bị bị lỗi / hư hại mới?
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Chỉ tích chọn nếu máy phát sinh trầy xước nặng/hỏng hóc
+                        so với lúc giao.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isDamaged}
+                      disabled={!isOwner}
+                      onChange={(e) => setIsDamaged(e.target.checked)}
+                      className="w-6 h-6 accent-red-600 rounded cursor-pointer disabled:opacity-50"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Ô Nhập nội dung & Tải ảnh minh chứng chứng cứ */}
+              <div className="lg:col-span-6 space-y-3">
+                <textarea
+                  value={isCheckOutMode ? noteCheckout : noteCheckin}
+                  onChange={(e) =>
+                    isCheckOutMode
+                      ? setNoteCheckout(e.target.value)
+                      : setNoteCheckin(e.target.value)
+                  }
+                  disabled={
+                    (isCheckOutMode && !isOwner) ||
+                    (!isCheckOutMode && hasOwnerSignedCheckIn)
+                  }
+                  placeholder={
+                    isCheckOutMode
+                      ? "Ghi chú tình trạng khi nhận lại thiết bị từ người thuê..."
+                      : "Ghi chú ngoại hình lúc giao máy (VD: Có một vết xước mờ kính trước...)"
+                  }
+                  className="w-full h-24 p-3 rounded-xl border border-gray-200 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none disabled:bg-gray-50 disabled:text-gray-500"
+                />
+
+                {/* Nút upload ảnh bảo vệ vai trò */}
+                <input
+                  type="file"
+                  id="handover-image-upload"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={
+                    uploading ||
+                    (isCheckOutMode && !isOwner) ||
+                    (!isCheckOutMode && hasOwnerSignedCheckIn)
+                  }
+                />
+                <label
+                  htmlFor="handover-image-upload"
+                  className={`w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 cursor-pointer transition ${uploading || (isCheckOutMode && !isOwner) || (!isCheckOutMode && hasOwnerSignedCheckIn) ? "opacity-50 cursor-not-allowed bg-gray-50" : ""}`}
+                >
+                  <span>{uploading ? "" : ""}</span>
+                  {uploading
+                    ? "Đang tải ảnh lên..."
+                    : `Đính kèm ảnh hiện trạng (${isCheckOutMode ? imagesCheckout.length : imagesCheckin.length} ảnh)`}
+                </label>
+
+                {/* Grid hiển thị hình ảnh hiện trạng theo từng mốc */}
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {(isCheckOutMode ? imagesCheckout : imagesCheckin).map(
+                    (url: string, index: number) => (
+                      <div
+                        key={index}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group"
+                      >
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                        {((isCheckOutMode && isOwner) ||
+                          (!isCheckOutMode &&
+                            !hasOwnerSignedCheckIn &&
+                            isOwner)) && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 transition"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                {/* Nếu đang Check-out, hiển thị thêm box ảnh cũ lúc Check-in để tiện đối chiếu trực tiếp */}
+                {isCheckOutMode && imagesCheckin.length > 0 && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 mb-1">
+                      Xem lại hình ảnh đối chứng ngoại hình mốc Check-in:
+                    </p>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {imagesCheckin.map((url, i) => (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          key={i}
+                          className="aspect-square border border-gray-300 rounded overflow-hidden bg-white block"
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
 
-        <hr className="border-outline-variant/20" />
+          <hr className="border-gray-100" />
 
-        <div className="space-y-4">
-          <h3 className="font-bold text-sm text-outline uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">lock</span> Tiền cọc & Thế chấp
-          </h3>
-          <div className="flex gap-4">
-            <div className="flex-1 p-4 rounded-xl bg-surface-container-low border border-outline-variant/20">
-              <p className="text-xs text-on-surface-variant mb-1">Tiền đặt cọc cấu hình đơn</p>
-              <p className="text-lg font-bold text-primary">
-                {bookingData?.deposit_amount ? Number(bookingData.deposit_amount).toLocaleString('vi-VN') : '0'} VNĐ
-              </p>
-            </div>
-            <div className="flex-1 p-4 rounded-xl bg-surface-container-low border border-outline-variant/20">
-              <p className="text-xs text-on-surface-variant mb-1">Hình thức cọc đã chọn</p>
-              <p className="text-lg font-bold text-on-surface">
-                {bookingData?.selected_deposit_type === 'PAPERWORK' ? 'Giữ Giấy tờ (CCCD)' : 'Tiền mặt/Qua Sàn'}
-              </p>
-            </div>
-          </div>
-        </div>
+          {/* CAM KẾT PHÁP LÝ & KHU VỰC CHỮ KÝ */}
+          <div className="space-y-6">
+            {!viewOnly && (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="w-5 h-5 mt-0.5 accent-blue-600 rounded cursor-pointer"
+                />
+                <span className="text-sm text-gray-600 select-none font-medium">
+                  {isCheckOutMode
+                    ? "Bên Cho Thuê (Chủ máy) xác nhận đã kiểm nghiệm thu và tiếp nhận lại đầy đủ thiết bị, phụ kiện từ Bên Thuê đúng số lượng cấu hình, biên bản này làm căn cứ quyết định hoàn trả tiền ký quỹ."
+                    : "Tôi xác nhận đã kiểm tra đối chứng kỹ thực tế thiết bị trùng khớp danh mục, cam kết bảo quản tài sản vẹn toàn và hoàn trả đúng kỳ hạn quy định."}
+                </span>
+              </label>
+            )}
 
-        <hr className="border-outline-variant/20" />
-
-        <div className="space-y-6">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              className="w-5 h-5 mt-0.5 accent-primary rounded cursor-pointer" 
-            />
-            <span className="text-sm text-on-surface-variant">
-              {isCheckOutMode 
-                ? "Bên Cho Thuê xác nhận đã nhận lại đầy đủ thiết bị và phụ kiện từ Bên Thuê đúng cam kết, không có tranh chấp phát sinh thêm ngoài ghi chú."
-                : "Tôi xác nhận đã kiểm tra kỹ tình trạng thiết bị đúng mô tả ở trên và đồng ý chịu trách nhiệm bồi thường nếu làm hư hỏng theo chính sách sàn."
-              }
-            </span>
-          </label>
-
-          <div className="grid grid-cols-2 gap-8">
-            <div className="border-2 border-dashed border-outline-variant/30 rounded-xl h-40 flex flex-col items-center justify-center bg-surface-container-lowest/50 group hover:border-primary/50 transition-colors cursor-pointer">
-              <span className="material-symbols-outlined text-outline group-hover:text-primary mb-2">draw</span>
-              <p className="text-sm font-bold text-on-surface">Chữ ký Bên A</p>
-              <p className="text-xs text-outline">Chạm để ký điện tử</p>
-            </div>
-            <div className="border-2 border-dashed border-outline-variant/30 rounded-xl h-40 flex flex-col items-center justify-center bg-surface-container-lowest/50 group hover:border-primary/50 transition-colors cursor-pointer relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <span className="font-[Shantell_Sans] text-4xl text-primary transform -rotate-12 opacity-80">
-                   {renter?.full_name ? renter.full_name : 'Bên B'}
-                 </span>
+            {/* GRID CHỮ KÝ GIAI ĐOẠN 1 VÀ 2 (CHECK-IN) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              {/* CHỮ KÝ BÊN A (OWNER) */}
+              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-xs font-bold text-gray-700 mb-2">
+                  Chữ ký Bên A (Chủ máy) - Giao máy
+                </p>
+                {handoverReport?.signature_a &&
+                handoverReport.signature_a.trim() !== "" ? (
+                  <img
+                    src={handoverReport.signature_a}
+                    alt="Signature A"
+                    className="h-32 object-contain bg-white rounded-xl border p-1.5 shadow-2xs"
+                  />
+                ) : !isCheckOutMode && isOwner ? (
+                  <SignatureCanvas
+                    onSave={(base64) => setSignatureA(base64)}
+                    placeholder="Chủ máy giữ chuột trái/vẽ nét ký tại đây"
+                  />
+                ) : (
+                  <div className="h-32 w-full flex items-center justify-center text-xs text-gray-400 border border-dashed rounded-xl bg-white italic text-center px-4">
+                    Chờ chủ thiết bị vào lập biên bản và ký giao máy mốc 1
+                  </div>
+                )}
               </div>
-              <p className="text-sm font-bold text-on-surface absolute bottom-4">Bên B Đã Ký</p>
+
+              {/* CHỮ KÝ BÊN B (RENTER) */}
+              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-xs font-bold text-gray-700 mb-2">
+                  Chữ ký Bên B (Người thuê) - Nhận máy
+                </p>
+                {handoverReport?.signature_b &&
+                handoverReport.signature_b.trim() !== "" ? (
+                  <img
+                    src={handoverReport.signature_b}
+                    alt="Signature B"
+                    className="h-32 object-contain bg-white rounded-xl border p-1.5 shadow-2xs"
+                  />
+                ) : !isCheckOutMode ? (
+                  handoverReport?.signature_a ? (
+                    isRenter ? (
+                      <SignatureCanvas
+                        onSave={(base64) => setSignatureB(base64)}
+                        placeholder="Người thuê vẽ ký xác nhận nhận máy"
+                      />
+                    ) : (
+                      <div className="h-32 w-full flex items-center justify-center text-xs text-amber-700 font-bold border border-dashed border-amber-200 rounded-xl bg-amber-50 text-center px-4 animate-pulse">
+                        Chờ tài khoản Người thuê đăng nhập vào vẽ ký mốc 2...
+                      </div>
+                    )
+                  ) : (
+                    <div className="h-32 w-full flex items-center justify-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl bg-white font-medium px-4 text-center">
+                      Khóa ô ký: Đang đợi Bên A lập biên bản trước.
+                    </div>
+                  )
+                ) : (
+                  <div className="h-32 w-full flex items-center justify-center text-xs text-gray-400 border border-dashed rounded-xl bg-white italic">
+                    {handoverReport?.signature_b
+                      ? "Đã ký mốc check-in"
+                      : "Không có dữ liệu mốc nhận máy"}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* MỐC 3: KHUNG CHỮ KÝ LÚC TRẢ MÁY (CHECK-OUT - CHỈ HIỂN THỊ KHI ĐƠN ĐANG ACTIVE) */}
+            {isCheckOutMode && (
+              <div className="mt-6 p-6 rounded-2xl border border-red-200 bg-red-50/10 flex flex-col items-center justify-center max-w-xl mx-auto shadow-2xs">
+                <p className="text-xs font-extrabold text-red-700 mb-2 tracking-wide uppercase">
+                  3. Chữ ký Bên A (Chủ máy) - Xác nhận nghiệm thu thu hồi
+                  (Check-out)
+                </p>
+                {handoverReport?.signature_checkout &&
+                handoverReport.signature_checkout.trim() !== "" ? (
+                  <img
+                    src={handoverReport.signature_checkout}
+                    alt="Signature Checkout"
+                    className="h-32 object-contain bg-white rounded-xl border border-gray-200 p-1.5 shadow-2xs"
+                  />
+                ) : isOwner ? (
+                  <SignatureCanvas
+                    onSave={(base64) => setSignatureCheckout(base64)}
+                    placeholder="Chủ máy vẽ nét ký tiếp nhận lại thiết bị hoàn cọc"
+                  />
+                ) : (
+                  <div className="h-32 w-full flex items-center justify-center text-xs text-red-700 font-semibold border border-dashed border-red-200 rounded-xl bg-white text-center px-4">
+                    Đang chờ Chủ thiết bị (Bên A) kiểm tra máy thực tế và ký
+                    nhận thu hồi tài sản...
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-      </div>
+        {/* FOOTER BUTTONS ACTION */}
+        <div className="bg-gray-50 p-6 flex justify-end gap-4 border-t border-gray-100">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-2 text-sm font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+            >
+              Quay lại đơn
+            </button>
+          )}
 
-      <div className="bg-surface-container p-6 flex justify-end gap-4">
-        {onCancel && (
-          <button 
+          {!viewOnly && ( 
+          <button
             type="button"
-            onClick={onCancel}
-            className="px-6 py-2.5 font-bold rounded-lg border border-outline-variant/30 text-on-surface hover:bg-surface-dim transition-colors"
+            disabled={
+              !agreed ||
+              isSubmitting ||
+              uploading ||
+              (!isCheckOutMode && isRenter && !handoverReport?.signature_a) || 
+              (isCheckOutMode && !isOwner) 
+            }
+            onClick={handleSubmit}
+            className={`px-8 py-2.5 text-sm font-bold rounded-xl flex items-center gap-2 transition shadow-md ${
+              agreed && !isSubmitting && !uploading
+                ? isCheckOutMode
+                  ? "bg-red-600 text-white hover:bg-red-700 shadow-red-100"
+                  : "bg-[#0b45b3] text-white hover:bg-blue-700 shadow-blue-100"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+            }`}
           >
-            Hủy bỏ
+            <span>{isSubmitting ? "" : ""}</span>
+            {isSubmitting
+              ? "Đang xử lý biên bản..."
+              : isCheckOutMode
+                ? "Xác nhận thu hồi máy (Check-out)"
+                : !handoverReport?.signature_a
+                  ? "Ký tên & Gửi biên bản Bên A"
+                  : "Ký nhận máy & Kích hoạt đơn hàng"}
           </button>
-        )}
-        <button 
-          type="button"
-          disabled={!agreed || isSubmitting || uploading}
-          onClick={handleSubmit}
-          className={`px-8 py-2.5 font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg ${
-            agreed && !isSubmitting && !uploading
-            ? (isCheckOutMode ? 'bg-error text-white hover:opacity-90 shadow-error/20' : 'bg-primary text-on-primary hover:opacity-90 shadow-primary/20') 
-            : 'bg-surface-dim text-outline cursor-not-allowed shadow-none'
-          }`}
-        >
-          <span className="material-symbols-outlined text-sm">
-            {isSubmitting ? 'hourglass_empty' : 'check_circle'}
-          </span> 
-          {isSubmitting ? 'Đang xử lý...' : (isCheckOutMode ? 'Xác nhận trả máy (Check-out)' : 'Hoàn tất bàn giao')}
-        </button>
+          )}
+        </div>
       </div>
-
-    </div>
     </>
   );
 }

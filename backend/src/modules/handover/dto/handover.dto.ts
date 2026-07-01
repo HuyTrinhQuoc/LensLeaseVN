@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsBoolean, IsNotEmpty } from 'class-validator';
 
 export class CreateCheckInDto {
   @IsString()
@@ -7,13 +7,16 @@ export class CreateCheckInDto {
 
   @IsArray()
   @IsString({ each: true })
-  images_checkin: string[];
+  @IsOptional() 
+  images_checkin?: string[];
 
   @IsString()
-  signature_a: string;
+  @IsOptional() 
+  signature_a?: string;
 
   @IsString()
-  signature_b: string;
+  @IsOptional() 
+  signature_b?: string;
 }
 
 export class CreateCheckOutDto {
@@ -27,4 +30,8 @@ export class CreateCheckOutDto {
 
   @IsBoolean()
   is_damaged: boolean;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Chữ ký nghiệm thu Check-out của chủ máy không được để trống' })
+  signature_checkout: string;
 }
