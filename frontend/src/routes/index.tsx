@@ -35,6 +35,7 @@ import BecomeOwnerPage from '../pages/Profile/BecomeOwnerPage';
 import DashboardOrdersPage from '../pages/Dashboard/DashboardOrdersPage';
 import DashboardMyListingsPage from '../pages/Dashboard/DashboardMyListingsPage';
 import DashboardStatsPage from '../pages/Dashboard/DashboardStatsPage';
+import DashboardPromotionsPage from '../pages/Dashboard/DashboardPromotionsPage';
 import HandoverForm from '../components/layout/HandoverForm';
 import VerifyEmail from '../components/layout/VerifyEmail';
 import AdminLayout from '../components/AdminLayout/AdminLayout';
@@ -43,11 +44,7 @@ import AdminUserManagement from '../pages/AdminUserManagement/AdminUserManagemen
 import AdminListingsManagement from '../pages/AdminListingsManagement/AdminListingsManagement';
 import AdminFinance from '../pages/AdminFinanceDashboard/AdminFinance';
 import AdminOwnerApplicationsPage from '../pages/AdminOwnerApplications/AdminOwnerApplicationsPage';
-import AdminBookingManagement from '../pages/AdminBookingManagement/AdminBookingManagement';
-import { NotificationDropdown } from '../components/AdminNotification/NotificationDropdown';
-import  { Schedule } from '../pages/DeviceSchedulePage/DeviceSchedulePage';
-import DeviceSchedulePage from '../pages/DeviceSchedulePage/ScheduleDashboard';
-
+import AdminPromotionsPage from '../pages/AdminPromotions/AdminPromotionsPage';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -104,6 +101,7 @@ export default function AppRoutes() {
         <Route path="wallet/topup/result" element={<WalletTopupResultPage />} />
         <Route path="my-listings" element={<DashboardMyListingsPage />} />
         <Route path="stats" element={<DashboardStatsPage />} />
+        <Route path="promotions" element={<DashboardPromotionsPage />} />
         <Route path="new-listing" element={<NewListingPage />} />
           <Route path="device-schedule" element={<DeviceSchedulePage />} />  
 
@@ -120,6 +118,8 @@ export default function AppRoutes() {
   <Route path="users" element={<AdminUserManagement />} /> 
   
   <Route path="listings" element={<AdminListingsManagement />} /> 
+
+  <Route path="promotions" element={<AdminPromotionsPage />} /> 
 
   <Route path="owner-applications" element={<AdminOwnerApplicationsPage />} />
   

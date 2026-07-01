@@ -15,6 +15,7 @@ import '../../styles/profile-dashboard.css';
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard/orders':      'Đơn cho thuê',
   '/dashboard/wallet':      'Ví của tôi',
+  '/dashboard/promotions':  'Voucher của tôi',
   '/dashboard/my-listings': 'Thiết bị của tôi',
   '/dashboard/stats':       'Thống kê',
   '/profile':               'Hồ sơ của tôi',
