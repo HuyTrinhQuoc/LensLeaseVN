@@ -40,4 +40,22 @@ export class AdminUserController {
     this.adminUserService.assertAdmin(headers);
     return this.adminUserService.updateKycStatus(id, status);
   }
+
+  @Patch(':id/lock')
+lockUser(
+  @Headers() headers: Record<string, string>,
+  @Param('id') id: string,
+) {
+  this.adminUserService.assertAdmin(headers);
+  return this.adminUserService.lockUser(id);
+}
+
+@Patch(':id/unlock')
+unlockUser(
+  @Headers() headers: Record<string, string>,
+  @Param('id') id: string,
+) {
+  this.adminUserService.assertAdmin(headers);
+  return this.adminUserService.unblockUser(id);
+}
 }

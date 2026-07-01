@@ -60,6 +60,8 @@ export class AdminUserService {
         full_name: true,
         email: true,
         role: true,
+        status: true,
+        rating_avg: true,
         kyc_status: true,
         created_at: true,
       },
@@ -107,4 +109,28 @@ export class AdminUserService {
     });
     return { message: 'Cập nhật trạng thái KYC thành công', user };
   }
+
+
+  async lockUser(id: string) {
+  const user = await this.prisma.user.update({
+    where: { id },
+    data: {
+      status: 'LOCKED',
+    },
+  });
+
+  return {
+    message: 'Khóa tài khoản thành công',
+    user,
+  };
+}
+
+async unblockUser(id: string) {
+  return this.prisma.user.update({
+    where: { id },
+    data: {
+      status: 'ACTIVE',
+    },
+  });
+}
 }
