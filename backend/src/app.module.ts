@@ -25,7 +25,7 @@ import { OwnerApplicationsModule } from './modules/owner-applications/owner-appl
 import { AdminBookingModule } from './admin-booking/admin-booking.module';
 import { AdminNotificationModule } from './admin-notification/admin-notification.module';
 import { ScheduleModule } from './schedule/schedule.module';
-
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 
 @Module({
@@ -40,6 +40,7 @@ import { ScheduleModule } from './schedule/schedule.module';
     BookingsModule,
     WalletModule,
     PaymentsModule,
+    ReviewsModule,
     ChatModule,
     AdminUserModule,
 

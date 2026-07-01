@@ -1,6 +1,5 @@
 import api from "./api";
 
-
 export const handoverService = {
   getReport: async (bookingId: string) => {
     const res = await api.get(`/handover-reports/${bookingId}`);
@@ -9,9 +8,9 @@ export const handoverService = {
 
   processCheckIn: async (bookingId: string, data: {
     note_checkin?: string;
-    images_checkin: string[];
-    signature_a: string;
-    signature_b: string;
+    images_checkin?: string[];
+    signature_a?: string | null;
+    signature_b?: string | null;
   }) => {
     const res = await api.post(`/handover-reports/${bookingId}/check-in`, data);
     return res.data;
@@ -21,6 +20,7 @@ export const handoverService = {
     note_checkout?: string;
     images_checkout: string[];
     is_damaged: boolean;
+    signature_checkout: string;
   }) => {
     const res = await api.put(`/handover-reports/${bookingId}/check-out`, data);
     return res.data;

@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import ProductGallery from "../../components/product-detail/ProductGallery";
-import BookingSidebar from "../../components/product-detail/BookingSidebar"; 
+import BookingSidebar from "../../components/product-detail/BookingSidebar";
 import ProductSpecs from "../../components/product-detail/ProductSpecs";
 import ProductCard from "../../components/layout/ProductCard";
 import Pagination from "../../components/common/Pagination";
-import { useSupabaseLensById, useSupabaseLens } from "../../hooks/useSupabaseLens";
+import {
+  useSupabaseLensById,
+  useSupabaseLens,
+} from "../../hooks/useSupabaseLens";
+import { supabase } from "../../lib/supabase";
+import axios from "axios";
 
 const RELATED_PER_PAGE = 4;
 
@@ -14,9 +19,65 @@ export default function ProductDetailPage() {
   const [relatedPage, setRelatedPage] = useState(1);
 
   // Fetch chi tiết sản phẩm từ Supabase
-  const { product, loading, error } = useSupabaseLensById(id || '');
+  const { product, loading, error } = useSupabaseLensById(id || "");
 
-  // Fetch sản phẩm liên quan
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+
+  useEffect(() => {
+  if (!id) return;
+  async function fetchReviews() {
+    setReviewsLoading(true);
+
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from("reviews")
+      .select("id, rating, comment, created_at, reviewer_id")
+      .eq("lens_id", id);
+
+    if (reviewsError) {
+      console.error("Lỗi lấy danh sách reviews:", reviewsError);
+      setReviewsLoading(false);
+      return;
+    }
+
+    if (reviewsData && reviewsData.length > 0) {
+      const reviewerIds = Array.from(
+        new Set(reviewsData.map((r) => r.reviewer_id))
+      );
+
+      const { data: usersData, error: usersError } = await supabase
+        .from("users")
+        .select("id, full_name, avatar_url")
+        .in("id", reviewerIds);
+
+      if (usersError) {
+        console.error(
+          "Lỗi lấy thông tin người dùng từ bảng users:",
+          usersError
+        );
+      }
+      const mappedReviews = reviewsData.map((review) => {
+        const matchedUser = usersData?.find(
+          (u) => u.id === review.reviewer_id
+        );
+        
+
+        return {
+          ...review,
+          reviewer: matchedUser || null, 
+        };
+      });
+
+      setReviews(mappedReviews);
+    } else {
+      setReviews([]);
+    }
+
+    setReviewsLoading(false);
+  }
+  fetchReviews();
+}, [id]);
+
   const related = useSupabaseLens({
     page: relatedPage,
     limit: RELATED_PER_PAGE,
@@ -40,8 +101,13 @@ export default function ProductDetailPage() {
       <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
         <div className="text-center space-y-4">
           <div className="text-6xl">😔</div>
-          <p className="text-red-500 font-medium text-lg">{error.message || "Không tìm thấy thiết bị!"}</p>
-          <Link to="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+          <p className="text-red-500 font-medium text-lg">
+            {error.message || "Không tìm thấy thiết bị!"}
+          </p>
+          <Link
+            to="/products"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
             ← Quay lại danh sách
           </Link>
         </div>
@@ -52,15 +118,16 @@ export default function ProductDetailPage() {
   return (
     <div className="bg-[#f8f9fa] min-h-screen pb-24 pt-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
         {/* Bố cục chia tỷ lệ 65% (Trái) - 35% (Phải) */}
         {/* Cột phải kéo cao bằng cột trái (lg:items-stretch) để sticky có vùng bám — không bị cuộn mất theo nội dung dài. */}
         <div className="flex flex-col gap-8 lg:flex-row lg:items-stretch lg:gap-12 relative">
-          
           {/* ================= CỘT TRÁI ================= */}
           <div className="w-full lg:w-[65%] space-y-10">
             {/* Khối 1: Hình ảnh */}
-            <ProductGallery images={product.images} thumbnail={product.thumbnail || undefined} />
+            <ProductGallery
+              images={product.images}
+              thumbnail={product.thumbnail || undefined}
+            />
 
             {/* Khối 2: Tiêu đề & Thông tin cơ bản */}
             <div className="space-y-4">
@@ -68,55 +135,121 @@ export default function ProductDetailPage() {
                 {product.title}
               </h1>
               <div className="flex items-center text-gray-500 text-sm gap-2">
-                <span></span> 
-                {product.district && product.city 
-                  ? `${product.district}, ${product.city}` 
+                <span></span>
+                {product.district && product.city
+                  ? `${product.district}, ${product.city}`
                   : "Vị trí chưa cập nhật"}
               </div>
             </div>
 
             {/* Khối 3: Thông số kỹ thuật */}
-            <ProductSpecs brand={product.brand || undefined} specs={undefined} />
-            
+            <ProductSpecs
+              brand={product.brand || undefined}
+              specs={undefined}
+            />
+
             {/* Khối 4: Mô tả thiết bị */}
             {product.description && (
               <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-                 <h3 className="text-xl font-bold text-gray-900 mb-4">Mô tả thiết bị</h3>
-                 <p className="text-gray-600 leading-relaxed whitespace-pre-line text-sm">
-                   {product.description}
-                 </p>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">
+                  Mô tả thiết bị
+                </h3>
+                <p className="text-gray-600 leading-relaxed whitespace-pre-line text-sm">
+                  {product.description}
+                </p>
               </div>
             )}
 
-
-                    {/* 4. Khối Đánh Giá Khách Hàng (Dựa theo thiết kế) */}
-             <div className="mt-4">
-               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Đánh giá từ khách hàng</h3>
+            {/* 4. Khối Đánh Giá Khách Hàng (Dựa theo thiết kế) */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Đánh giá từ khách hàng
+                </h3>
                 <div className="flex items-center gap-2">
                   <span className="text-yellow-400">⭐</span>
-                  <span className="font-bold">{product.rating_avg ? Number(product.rating_avg).toFixed(1) : "Chưa có"}</span>
-                 <span className="text-gray-500 text-sm">({product.review_count || 0} đánh giá)</span>
-               </div>
-                             </div>
+                  <span className="font-bold">
+                    {product.rating_avg
+                      ? Number(product.rating_avg).toFixed(1)
+                      : "Chưa có"}
+                  </span>
+                  <span className="text-gray-500 text-sm">
+                    ({product.review_count || 0} đánh giá)
+                  </span>
+                </div>
+              </div>
 
-               <div className="space-y-4">
-                 {[1, 2].map((item) => (
-                  <div key={item} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-xl">👤</div>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900">Người dùng ẩn danh {item}</h4>
-                        <p className="text-xs text-gray-500">Đã thuê 1 tuần trước</p>
-                      </div>
-                      <div className="ml-auto text-yellow-400 text-sm">⭐⭐⭐⭐⭐</div>
-                    </div>
-                    <p className="text-sm text-gray-700">Thiết bị hoạt động hoàn hảo, rất đáng tiền. Chủ máy hỗ trợ nhiệt tình.</p>
+              <div className="space-y-4">
+                {reviewsLoading ? (
+                  <div className="text-center py-4 text-gray-400 text-sm">
+                    Đang tải nhận xét...
                   </div>
-                ))}
+                ) : reviews.length === 0 ? (
+                  <div className="text-center py-4 text-gray-400 text-sm bg-white rounded-2xl border border-gray-100">
+                    Thiết bị chưa có đánh giá nào.
+                  </div>
+                ) : (
+                  reviews.map((item: any) => {
+                    const reviewerName =
+                      item.reviewer?.full_name || "Người dùng ẩn danh";
+                    const avatarUrl =
+                      item.reviewer?.avatar_url &&
+                      item.reviewer.avatar_url.trim() !== ""
+                        ? item.reviewer.avatar_url
+                        : null;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-xl overflow-hidden">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                className="w-full h-full object-cover"
+                                alt={reviewerName}
+                              />
+                            ) : (
+                              "👤"
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-gray-900">
+                              {reviewerName}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              Đã đánh giá vào{" "}
+                              {new Date(item.created_at).toLocaleDateString(
+                                "vi-VN",
+                              )}
+                            </p>
+                          </div>
+                          <div className="ml-auto flex text-sm">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <span
+                                key={i}
+                                className={
+                                  i < item.rating
+                                    ? "text-yellow-400"
+                                    : "text-gray-200"
+                                }
+                              >
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 whitespace-pre-line">
+                          {item.comment || "Khách hàng không để lại bình luận."}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-
           </div>
 
           {/* ================= CỘT PHẢI ================= */}
@@ -127,34 +260,42 @@ export default function ProductDetailPage() {
                 ownerId={product.owner_id}
                 pricePerDay={Number(product.price_per_day)}
                 available={product.available !== false}
-                depositAmount={Number((product as any).required_deposit_amount || 0)}
-                marketValue={(product as any).market_value ? Number((product as any).market_value) : undefined}
+                depositAmount={Number(
+                  (product as any).required_deposit_amount || 0,
+                )}
+                marketValue={
+                  (product as any).market_value
+                    ? Number((product as any).market_value)
+                    : undefined
+                }
                 lensMeta={{
                   title: product.title,
                   image_url:
-                    product.images?.[0]?.image_url || product.thumbnail || undefined,
+                    product.images?.[0]?.image_url ||
+                    product.thumbnail ||
+                    undefined,
                   brand: product.brand || undefined,
                   category_name: product.category?.name,
                   owner_name: product.owner?.full_name,
                   owner_rating:
-                    product.owner && 'rating_avg' in product.owner
+                    product.owner && "rating_avg" in product.owner
                       ? Number((product.owner as any).rating_avg)
                       : product.rating_avg != null
-                      ? Number(product.rating_avg)
-                      : undefined,
-                  allowed_deposit_types: Array.isArray((product as any).allowed_deposit_types)
+                        ? Number(product.rating_avg)
+                        : undefined,
+                  allowed_deposit_types: Array.isArray(
+                    (product as any).allowed_deposit_types,
+                  )
                     ? [...(product as any).allowed_deposit_types]
                     : undefined,
-                  required_deposit_amount: (product as any).required_deposit_amount != null
-                    ? Number((product as any).required_deposit_amount)
-                    : undefined,
+                  required_deposit_amount:
+                    (product as any).required_deposit_amount != null
+                      ? Number((product as any).required_deposit_amount)
+                      : undefined,
                 }}
               />
             </div>
           </div>
-
-          
-
         </div>
 
         {/* ================= SẢN PHẨM LIÊN QUAN ================= */}
@@ -177,14 +318,20 @@ export default function ProductDetailPage() {
               to="/products"
               className="text-blue-600 font-semibold hover:text-blue-800 transition-colors flex items-center gap-1 group"
             >
-              Xem tất cả <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
+              Xem tất cả{" "}
+              <span className="group-hover:translate-x-1 transition-transform">
+                &rarr;
+              </span>
             </Link>
           </div>
 
           {related.loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {Array.from({ length: RELATED_PER_PAGE }).map((_, i) => (
-                <div key={i} className="animate-pulse bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div
+                  key={i}
+                  className="animate-pulse bg-white rounded-2xl border border-gray-100 overflow-hidden"
+                >
                   <div className="aspect-[4/3] bg-gray-200" />
                   <div className="p-5 space-y-3">
                     <div className="h-5 bg-gray-200 rounded w-3/4" />
@@ -219,7 +366,6 @@ export default function ProductDetailPage() {
             </>
           )}
         </section>
-
       </div>
     </div>
   );
