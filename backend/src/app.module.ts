@@ -23,6 +23,9 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { EkycModule } from './modules/ekyc/ekyc.module';
 import { OwnerApplicationsModule } from './modules/owner-applications/owner-applications.module';
 import { AdminBookingModule } from './admin-booking/admin-booking.module';
+import { AdminNotificationModule } from './admin-notification/admin-notification.module';
+import { ScheduleModule } from './schedule/schedule.module';
+import { EquipmentModule } from './equipment/equipment.module';
 
 
 @Module({
@@ -49,6 +52,9 @@ import { AdminBookingModule } from './admin-booking/admin-booking.module';
     EkycModule,
     OwnerApplicationsModule,
     AdminBookingModule,
+    AdminNotificationModule,
+    ScheduleModule,
+    EquipmentModule,
 
   ],
   controllers: [AppController],

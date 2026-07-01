@@ -5,10 +5,13 @@ import { Toaster } from "react-hot-toast";
 import "./index.css";
 import AppRoutes from "./routes";
 import { CartProvider } from "./context/CartContext";
+import { Provider } from 'react-redux';
+import { store } from './store/store';
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
+    <Provider store={store}>
       <CartProvider>
         <Toaster
           position="top-center"
@@ -17,6 +20,7 @@ createRoot(document.getElementById("root")!).render(
         />
         <AppRoutes />
       </CartProvider>
+      </Provider>
     </BrowserRouter>
   </StrictMode>
 );

@@ -9,7 +9,10 @@ interface Props {
 
 export const BookingFilters: React.FC<Props> = ({ searchTerm, setSearchTerm, statusFilter, setStatusFilter }) => {
   return (
-    <div className="p-6 border-b border-outline/10 bg-surface flex flex-col md:flex-row gap-4 items-center">
+    <div>
+    <h1 className="ml-6 mt-5 text-2xl font-extrabold text-slate-800 tracking-tight">Quản lí đơn thuê</h1>
+    <div className="p-6 border-b border-outline/10  flex flex-col md:flex-row gap-4 items-center">
+    
       <div className="relative w-full md:w-96">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
         <input
@@ -34,6 +37,7 @@ export const BookingFilters: React.FC<Props> = ({ searchTerm, setSearchTerm, sta
           <option value="CANCELLED">Đã hủy</option>
         </select>
       </div>
+    </div>
     </div>
   );
 };

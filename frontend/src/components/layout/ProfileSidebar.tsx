@@ -31,6 +31,11 @@ const LENDER_MENU: SidebarItem[] = [
   },
   { icon: "camera", label: "Thiết bị của tôi", to: "/dashboard/my-listings" },
   { icon: "bar_chart", label: "Thống kê", to: "/dashboard/stats" },
+  {
+  icon: "calendar_month",
+  label: "Lịch thiết bị",
+  to: "/dashboard/device-schedule",
+}
 ];
 
 export default function ProfileSidebar() {
