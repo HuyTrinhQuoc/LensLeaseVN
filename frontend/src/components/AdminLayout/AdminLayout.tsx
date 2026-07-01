@@ -83,6 +83,11 @@ const AdminLayout: React.FC = () => {
             Tin đăng & Thiết bị
           </NavLink>
 
+          <NavLink to="/admin/promotions" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            Voucher
+          </NavLink>
+          
           <NavLink to="/admin/finance" className={getDesktopNavStyle}>
             <span className="material-symbols-outlined text-[24px]">payments</span>
             Tài chính
@@ -136,7 +141,35 @@ const AdminLayout: React.FC = () => {
         <Outlet />
       </main>
 
+      {/* BottomNavBar (Mobile) */}
+      <nav className="md:hidden fixed bottom-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] pb-safe">
+        <div className="flex justify-around items-center px-2 py-2">
+          <NavLink to="/admin/dashboard" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>dashboard</span>
+            <span className="mt-1 text-xs text-center w-full">Dashboard</span>
+          </NavLink>
+          
+          <NavLink to="/admin/users" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">group</span>
+            <span className="mt-1 text-xs text-center w-full">Users</span>
+          </NavLink>
+          
+          <NavLink to="/admin/listings" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">camera</span>
+            <span className="mt-1 text-xs text-center w-full">Listings</span>
+          </NavLink>
 
+          <NavLink to="/admin/promotions" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            <span className="mt-1 text-xs text-center w-full">Voucher</span>
+          </NavLink>
+          
+          <NavLink to="/admin/finance" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">payments</span>
+            <span className="mt-1 text-xs text-center w-full">Finance</span>
+          </NavLink>
+        </div>
+      </nav>
 
     </div>
   );

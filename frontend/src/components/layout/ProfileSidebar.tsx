@@ -29,6 +29,11 @@ const LENDER_MENU: SidebarItem[] = [
     label: "Ví của tôi",
     to: "/dashboard/wallet",
   },
+  {
+    icon: "confirmation_number",
+    label: "Voucher của tôi",
+    to: "/dashboard/promotions",
+  },
   { icon: "camera", label: "Thiết bị của tôi", to: "/dashboard/my-listings" },
   { icon: "bar_chart", label: "Thống kê", to: "/dashboard/stats" },
   {
