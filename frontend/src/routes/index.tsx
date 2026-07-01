@@ -48,6 +48,7 @@ import AdminPromotionsPage from '../pages/AdminPromotions/AdminPromotionsPage';
 import DeviceSchedulePage from '../pages/DeviceSchedulePage/ScheduleDashboard';
 import AdminBookingManagement from '../pages/AdminBookingManagement/AdminBookingManagement';
 import { NotificationDropdown } from '../components/AdminNotification/NotificationDropdown';
+import ProductComparePage from '../pages/Products/ProductComparePage';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -70,6 +71,7 @@ export default function AppRoutes() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/:id" element={<ProductDetailPage />} />
+        <Route path="/products/compare" element={<ProductComparePage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/wallet/topup/result" element={<WalletTopupResultPage />} />
         <Route path="/about" element={<AboutPage />} />

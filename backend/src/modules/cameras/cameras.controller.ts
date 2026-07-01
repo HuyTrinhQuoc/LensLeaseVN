@@ -49,6 +49,16 @@ export class CamerasController {
     };
   }
 
+  @Get('compare')
+  @ApiOperation({ summary: 'Lấy dữ liệu so sánh danh sách sản phẩm' })
+  async compareProducts(@Query('ids') ids: string) {
+    const products = await this.camerasService.compareProducts(ids);
+    return {
+      message: 'Lấy dữ liệu so sánh sản phẩm thành công!',
+      data: products,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
   async getCameraById(

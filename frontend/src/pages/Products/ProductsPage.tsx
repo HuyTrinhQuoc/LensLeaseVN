@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import type { ProductItem } from "../../type/product.type";
 import { SupabaseService } from "../../services/supabase.service";
 import ProductCard from "../../components/layout/ProductCard";
@@ -15,6 +15,7 @@ interface PaginatedResponse {
 
 export default function ProductsPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // ================= STATE CHO DỮ LIỆU =================
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -27,14 +28,66 @@ export default function ProductsPage() {
   const [sort, setSort] = useState<string>("popular");
   const [search, setSearch] = useState<string>("");
 
+  // ================= STATE CHO TÍNH NĂNG SO SÁNH =================
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareItems, setCompareItems] = useState<ProductItem[]>([]);
+
   useEffect(() => {
     const q = searchParams.get('search') || '';
     setSearch(q);
     setPage(1);
   }, [searchParams]);
 
+  useEffect(() => {
+    const updateCompareState = () => {
+      const ids: string[] = JSON.parse(localStorage.getItem('compare_product_ids') || '[]');
+      setCompareIds(ids);
+    };
+
+    updateCompareState();
+    window.addEventListener('storage', updateCompareState);
+    window.addEventListener('compare_changed', updateCompareState);
+
+    return () => {
+      window.removeEventListener('storage', updateCompareState);
+      window.removeEventListener('compare_changed', updateCompareState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (compareIds.length === 0) {
+      setCompareItems([]);
+      return;
+    }
+    const matchedItems = products.filter(p => compareIds.includes(p.id));
+    
+    setCompareItems(prev => {
+      const updated = [...matchedItems];
+      prev.forEach(p => {
+        if (!updated.some(u => u.id === p.id) && compareIds.includes(p.id)) {
+          updated.push(p);
+        }
+      });
+      return updated;
+    });
+  }, [compareIds, products]);
+
+  const handleRemoveCompareItem = (idToRemove: string) => {
+    const updatedIds = compareIds.filter(id => id !== idToRemove);
+    localStorage.setItem('compare_product_ids', JSON.stringify(updatedIds));
+    setCompareIds(updatedIds);
+    window.dispatchEvent(new Event('compare_changed')); 
+  };
+
+  const handleGoToComparePage = () => {
+    if (compareIds.length < 2) {
+      alert("Vui lòng chọn từ 2 thiết bị trở lên để tiến hành đối chiếu so sánh!");
+      return;
+    }
+    navigate(`/products/compare?ids=${compareIds.join(',')}`);
+  };
+
   // ================= STATE CHO BỘ LỌC (SIDEBAR) =================
-  // Sử dụng state tạm thời cho form, chỉ khi bấm "Áp dụng" mới fetch
   const [filterMinPrice, setFilterMinPrice] = useState<string>("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>("");
   const [filterBrand, setFilterBrand] = useState<string>("");
@@ -42,7 +95,6 @@ export default function ProductsPage() {
   const [filterRating, setFilterRating] = useState<string>("");
   const [filterCity, setFilterCity] = useState<string>("");
 
-  // State chính thức được dùng để gọi API
   const [appliedFilters, setAppliedFilters] = useState({
     minPrice: "",
     maxPrice: "",
@@ -80,14 +132,13 @@ export default function ProductsPage() {
     }
   };
 
-  // Gọi API mỗi khi page, sort, search hoặc appliedFilters thay đổi
   useEffect(() => {
     fetchProducts();
   }, [page, sort, search, appliedFilters]);
 
   // ================= HANDLERS =================
   const handleApplyFilters = () => {
-    setPage(1); // Reset về trang 1 khi lọc
+    setPage(1);
     setAppliedFilters({
       minPrice: filterMinPrice,
       maxPrice: filterMaxPrice,
@@ -104,15 +155,11 @@ export default function ProductsPage() {
     }
   };
 
-  const formatPrice = (price?: number | null): string => {
-    return new Intl.NumberFormat('vi-VN').format(price || 0);
-  };
-
   return (
-    <div className="bg-[#f8f9fa] min-h-screen pb-20 pt-8">
+    <div className="bg-[#f8f9fa] min-h-screen pb-32 pt-8 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-8">
         
-        {/* ================= CỘT TRÁI: SIDEBAR LỌC (Khoảng 25%) ================= */}
+        {/* ================= CỘT TRÁI: SIDEBAR LỌC ================= */}
         <aside className="w-full lg:w-1/4">
           <div className="sticky top-24 space-y-6">
             <div className="flex items-center justify-between mb-2">
@@ -247,7 +294,6 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {/* Nút Áp dụng */}
               <button 
                 onClick={handleApplyFilters}
                 className="w-full bg-[#1a3fc7] text-white font-black py-4 rounded-2xl hover:bg-blue-800 transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
@@ -256,23 +302,11 @@ export default function ProductsPage() {
                 ÁP DỤNG
               </button>
             </div>
-
-            {/* Banner hỗ trợ */}
-            <div className="bg-gradient-to-br from-gray-900 to-blue-900 p-6 rounded-[24px] text-white shadow-lg overflow-hidden relative group">
-              <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-              <h4 className="font-bold text-sm mb-2 relative z-10">Cần tư vấn ngay?</h4>
-              <p className="text-[11px] text-gray-300 mb-4 leading-relaxed relative z-10">Liên hệ đội ngũ CSKH để tìm thiết bị phù hợp nhất với nhu cầu của bạn.</p>
-              <a href="/contact" className="inline-flex items-center gap-2 text-blue-400 text-[11px] font-black uppercase tracking-wider hover:text-white transition-colors relative z-10">
-                GỌI HỖ TRỢ <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </a>
-            </div>
           </div>
         </aside>
 
-        {/* ================= CỘT PHẢI: KẾT QUẢ TÌM KIẾM (Khoảng 75%) ================= */}
+        {/* ================= CỘT PHẢI: KẾT QUẢ TÌM KIẾM ================= */}
         <main className="w-full lg:w-3/4">
-          
-          {/* Header Kết quả */}
           <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -334,9 +368,86 @@ export default function ProductsPage() {
               />
             </div>
           )}
-
         </main>
       </div>
+
+      {/* ================= COMPONENT: COMPARE BAR  ================= */}
+      {compareIds.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl z-50 animate-in slide-in-from-bottom duration-300">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            {/* Tiêu đề & Đếm số lượng */}
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-100 text-orange-700 w-10 h-10 rounded-xl flex items-center justify-center font-black">
+                {compareIds.length}
+              </div>
+              <div>
+                <h5 className="font-bold text-sm text-gray-900">Thiết bị đang chọn so sánh</h5>
+                <p className="text-xs text-gray-400 hidden sm:block">Tối đa 4 thiết bị cùng một lúc</p>
+              </div>
+            </div>
+
+            {/* Danh sách ảnh thu nhỏ các máy được chọn */}
+            <div className="flex items-center gap-4 flex-grow justify-center max-w-2xl overflow-x-auto py-1 scrollbar-hide">
+              {compareIds.map((id) => {
+                const matchedItem = compareItems.find(item => item.id === id);
+                const imgSrc = matchedItem?.thumbnail || "/placeholder.jpg";
+                const title = matchedItem?.title || "Thiết bị đang chọn";
+
+                return (
+                  <div key={id} className="relative w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 overflow-hidden flex-shrink-0 group">
+                    <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                    {/* Nút xóa nhanh khỏi mảng */}
+                    <button 
+                      onClick={() => handleRemoveCompareItem(id)}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow hover:bg-red-600 transition-colors"
+                      title="Bỏ chọn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+              
+              {/* Ô trống giả lập nhắc nhở (nếu chọn ít hơn 2) */}
+              {compareIds.length < 2 && (
+                <div className="text-xs text-orange-600 font-medium bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-xl animate-pulse">
+                  Chọn thêm ít nhất 1 thiết bị nữa để so sánh
+                </div>
+              )}
+            </div>
+
+            {/* Nút Hành Động */}
+            <div className="flex items-center gap-3 w-full sm:w-auto flex-shrink-0">
+              <button
+                onClick={() => {
+                  localStorage.setItem('compare_product_ids', '[]');
+                  setCompareIds([]);
+                  window.dispatchEvent(new Event('compare_changed'));
+                }}
+                className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2 transition-colors"
+              >
+                Xóa hết
+              </button>
+              
+              <button
+                onClick={handleGoToComparePage}
+                disabled={compareIds.length < 2}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg w-full sm:w-auto justify-center ${
+                  compareIds.length >= 2
+                    ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-500/20 active:scale-95'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                }`}
+              >
+                <span>So sánh</span>
+                <span className="material-symbols-outlined text-sm">compare_arrows</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
