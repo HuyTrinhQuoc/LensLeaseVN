@@ -187,4 +187,41 @@ export class CamerasService {
       );
     }
   }
+
+  // ================= CHỨC NĂNG SO SÁNH SẢN PHẨM =================
+  async compareProducts(idsString: string) {
+    if (!idsString) {
+      return [];
+    }
+
+    const ids = idsString.split(',').map(id => id.trim()).filter(Boolean);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const products = await this.prisma.lensListing.findMany({
+      where: {
+        id: { in: ids },
+        is_deleted: false,
+      },
+      include: {
+        images: true,
+        specs: true,
+        category: true,
+        owner: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            rating_avg: true,
+          },
+        },
+      },
+    });
+
+    return ids
+      .map(id => products.find(p => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => !!p);
+  }
 }
