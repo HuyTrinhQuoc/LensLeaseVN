@@ -72,7 +72,7 @@ export default function AppRoutes() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/news" element={<NewsPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="/handover" element={<HandoverForm />} />
+        {/* <Route path="/handover" element={<HandoverForm />} /> */}
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/success" element={<BookingSuccessPage />} />
         <Route path="/bookings/payment-result" element={<BookingPaymentResultPage />} />
@@ -103,6 +103,7 @@ export default function AppRoutes() {
         <Route path="stats" element={<DashboardStatsPage />} />
         <Route path="promotions" element={<DashboardPromotionsPage />} />
         <Route path="new-listing" element={<NewListingPage />} />
+          <Route path="device-schedule" element={<DeviceSchedulePage />} />  
 
         {/* Reuse existing NewListingPage nếu có */}
 
@@ -123,6 +124,10 @@ export default function AppRoutes() {
   <Route path="owner-applications" element={<AdminOwnerApplicationsPage />} />
   
   <Route path="finance" element={<AdminFinance />} />  
+
+  <Route path="bookings" element={<AdminBookingManagement />} />  
+
+    <Route path="notification" element={<NotificationDropdown />} />  
 </Route>
 
       {/* ══════════════════════════════════════════════
@@ -136,8 +141,10 @@ export default function AppRoutes() {
           ══════════════════════════════════════════════ */}
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/login-success" element={<LoginSuccess />} />
+      <Route path="/login/success" element={<LoginSuccess />} />
       <Route path="/verify" element={<VerifyEmail />} />
+
+   <Route path="schedule" element={<Schedule />} />  
     </Routes>
   );
 }

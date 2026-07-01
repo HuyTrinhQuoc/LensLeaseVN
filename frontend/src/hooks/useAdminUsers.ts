@@ -6,6 +6,7 @@ export interface UserDetail {
   full_name: string;
   email: string;
   role: string;
+  rating_avg?: number;
   kyc_status: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   created_at: string;
   cccd_front_url?: string | null;
@@ -14,6 +15,7 @@ export interface UserDetail {
   has_cccd_images?: boolean;
   address?: string;
   phone?: string;
+  status?: 'ACTIVE' | 'LOCKED';
 }
 
 export function useAdminUsers() {
@@ -74,6 +76,37 @@ export function useAdminUsers() {
       console.error('Lỗi lấy chi tiết user:', error);
     }
   };
+ const handleLockUser = async (userId: string) => {
+  try {
+    await api.patch(`/admin/users/${userId}/lock`);
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, status: 'LOCKED' }
+          : u
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
+};
+const handleUnlockUser = async (userId: string) => {
+  try {
+    await api.patch(`/admin/users/${userId}/unlock`);
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, status: 'ACTIVE' }
+          : u
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 
   return {
     users,
@@ -85,5 +118,7 @@ export function useAdminUsers() {
     setSelectedUser: handleSelectUser,
     closeSidebar: () => setSelectedUser(null),
     handleKycAction,
+    handleLockUser,
+    handleUnlockUser
   };
 }
