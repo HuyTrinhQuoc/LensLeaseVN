@@ -25,8 +25,8 @@ import { OwnerApplicationsModule } from './modules/owner-applications/owner-appl
 import { AdminBookingModule } from './admin-booking/admin-booking.module';
 import { AdminNotificationModule } from './admin-notification/admin-notification.module';
 import { ScheduleModule } from './schedule/schedule.module';
-import { EquipmentModule } from './equipment/equipment.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+
 
 @Module({
   imports: [
@@ -55,7 +55,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     AdminBookingModule,
     AdminNotificationModule,
     ScheduleModule,
-    EquipmentModule,
+
 
   ],
   controllers: [AppController],
