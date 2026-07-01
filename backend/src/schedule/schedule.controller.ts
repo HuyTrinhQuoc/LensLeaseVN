@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Request, UseGuards,Post, Body, Delete } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport'; // <-- Import thẳng từ passport giống bên Auth
 import { DeviceScheduleService } from './schedule.service';
 
@@ -19,5 +19,17 @@ export class DeviceScheduleController {
   @Get('events/:lensId')
   async getEvents(@Param('lensId') lensId: string) {
     return this.scheduleService.getEquipmentEvents(lensId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('events/:lensId/block')
+  async blockDates(@Param('lensId') lensId: string, @Body() body: { start_date: string, end_date: string, reason: string }) {
+    return this.scheduleService.blockDates(lensId, body);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('events/block/:blockId')
+  async unblockDate(@Param('blockId') blockId: string) {
+    return this.scheduleService.unblockDate(blockId);
   }
 }
