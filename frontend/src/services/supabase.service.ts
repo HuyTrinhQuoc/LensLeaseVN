@@ -66,12 +66,8 @@ export const SupabaseService = {
         // =====================================================
 
         .or('is_deleted.is.null,is_deleted.eq.false')
-
-        // approval_status an toàn hơn - accept both APPROVED and PENDING
-        .in('approval_status', [
-          'APPROVED',
-          'PENDING'
-        ]);
+        .eq('approval_status', 'APPROVED')
+        .eq('available', true);
 
       // =====================================================
       // CATEGORY FILTER
@@ -311,7 +307,8 @@ export const SupabaseService = {
   // =====================================================
 
   async getLensListingById(
-    id: string
+    id: string,
+    options?: { viewerUserId?: string },
   ): Promise<ProductItem> {
 
     try {
@@ -359,6 +356,16 @@ export const SupabaseService = {
           'Không tìm thấy sản phẩm!'
         );
 
+      }
+
+      const isPublic =
+        data.approval_status === 'APPROVED' && data.available === true;
+      const isOwner =
+        !!options?.viewerUserId &&
+        data.owner_id === options.viewerUserId;
+
+      if (!isPublic && !isOwner) {
+        throw new Error('Không tìm thấy sản phẩm!');
       }
 
       return data as ProductItem;
@@ -413,14 +420,9 @@ export const SupabaseService = {
         `)
 
         .or('is_deleted.is.null,is_deleted.eq.false')
-
-        .in('approval_status', [
-          'APPROVED',
-          'approved',
-          'Approved'
-        ])
-
-        .limit(5);
+        .eq('approval_status', 'APPROVED')
+        .eq('available', true)
+        .limit(8);
 
       if (error) {
 

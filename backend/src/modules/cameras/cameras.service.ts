@@ -37,6 +37,7 @@ export class CamerasService {
       where.owner_id = owner_id;
     } else {
       where.approval_status = 'APPROVED';
+      where.available = true;
     }
 
     if (brand) where.brand = { contains: brand, mode: 'insensitive' };
@@ -82,7 +83,10 @@ export class CamerasService {
     };
   }
 
-  async findById(id: string) {
+  async findById(
+    id: string,
+    viewer?: { userId?: string; role?: string },
+  ) {
     const product = await this.prisma.lensListing.findUnique({
       where: { id },
       include: {
@@ -100,9 +104,19 @@ export class CamerasService {
       },
     });
 
-    if (!product) {
+    if (!product || product.is_deleted) {
       throw new NotFoundException('Không tìm thấy sản phẩm này!');
     }
+
+    const isAdmin = viewer?.role === 'ADMIN';
+    const isOwner = !!viewer?.userId && product.owner_id === viewer.userId;
+    const isPublic =
+      product.approval_status === 'APPROVED' && product.available;
+
+    if (!isAdmin && !isOwner && !isPublic) {
+      throw new NotFoundException('Không tìm thấy sản phẩm này!');
+    }
+
     return product;
   }
   async createListing(createListingDto: CreateCameraDto, userId: string) {

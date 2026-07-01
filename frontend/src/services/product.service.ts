@@ -1,5 +1,6 @@
 import api from './api';
 import { SupabaseService } from './supabase.service';
+import { getAuthToken, getUserIdFromToken } from '../utils/auth';
 
 export const ProductService = {
   // Lấy danh sách sản phẩm (có filter, phân trang)
@@ -31,13 +32,15 @@ export const ProductService = {
 
   getProductById: async (id: string) => {
     try {
-      // Thử fetch từ Supabase trước
-      const product = await SupabaseService.getLensListingById(id);
+      const viewerUserId = getUserIdFromToken() ?? undefined;
+      const product = await SupabaseService.getLensListingById(id, { viewerUserId });
       return product;
     } catch (error) {
       console.warn('Supabase fetch failed, falling back to API:', error);
-      // Fallback sang API backend
-      const response = await api.get(`/lenses/${id}`);
+      const token = getAuthToken();
+      const response = await api.get(`/lenses/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       return response.data.data ? response.data.data : response.data;
     }
   },

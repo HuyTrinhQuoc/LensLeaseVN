@@ -17,21 +17,15 @@ export class WalletService {
    * Lấy hoặc tạo ví cho user.
    */
   async getOrCreateWallet(userId: string) {
-    let wallet = await this.prisma.wallet.findUnique({
+    return this.prisma.wallet.upsert({
       where: { user_id: userId },
+      create: {
+        user_id: userId,
+        available_balance: 0,
+        pending_balance: 0,
+      },
+      update: {},
     });
-
-    if (!wallet) {
-      wallet = await this.prisma.wallet.create({
-        data: {
-          user_id: userId,
-          available_balance: 0,
-          pending_balance: 0,
-        },
-      });
-    }
-
-    return wallet;
   }
 
   /**

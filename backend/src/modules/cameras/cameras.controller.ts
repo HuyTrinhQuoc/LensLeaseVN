@@ -10,6 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import * as jwt from 'jsonwebtoken';
 import { CamerasService } from './cameras.service';
 import { CreateCameraDto } from './dto/create-camera.dto';
 
@@ -17,6 +18,26 @@ import { CreateCameraDto } from './dto/create-camera.dto';
 @Controller('lenses')
 export class CamerasController {
   constructor(private readonly camerasService: CamerasService) {}
+
+  private parseOptionalViewer(headers: Record<string, string>) {
+    const token =
+      headers['authorization']?.replace('Bearer ', '') || headers['x-user-id'];
+    if (!token || token.split('.').length !== 3) {
+      return undefined;
+    }
+
+    try {
+      const payload = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'lenslease_super_secret_key',
+      ) as { userId?: string; sub?: string; role?: string };
+      const userId = payload.userId ?? payload.sub;
+      if (!userId) return undefined;
+      return { userId, role: payload.role };
+    } catch {
+      return undefined;
+    }
+  }
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách sản phẩm' })
@@ -30,8 +51,12 @@ export class CamerasController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
-  async getCameraById(@Param('id') id: string) {
-    const product = await this.camerasService.findById(id);
+  async getCameraById(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const viewer = this.parseOptionalViewer(headers);
+    const product = await this.camerasService.findById(id, viewer);
     return {
       message: 'Lấy chi tiết sản phẩm thành công!',
       data: product,

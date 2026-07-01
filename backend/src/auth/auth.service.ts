@@ -102,7 +102,11 @@ export class AuthService {
       throw new UnauthorizedException('Vui lòng xác nhận email trước khi đăng nhập');
     }
 
-    const accessToken = this.jwtService.sign({ userId: user.id, role: user.role });
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      userId: user.id,
+      role: user.role,
+    });
     return { 
       message: 'Đăng nhập thành công',
       accessToken, 
@@ -149,7 +153,11 @@ async googleLogin(req: any) {
     });
   }
 
-  const accessToken = this.jwtService.sign({ userId: user.id, role: user.role });
+  const accessToken = this.jwtService.sign({
+    sub: user.id,
+    userId: user.id,
+    role: user.role,
+  });
   return { 
     accessToken, 
     user: {

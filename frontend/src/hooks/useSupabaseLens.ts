@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { SupabaseService } from '../services/supabase.service';
+import { getUserIdFromToken } from '../utils/auth';
 import type { ProductItem } from '../type/product.type';
 
 interface UseSupabaseLensOptions {
@@ -94,7 +95,8 @@ export function useSupabaseLensById(id: string) {
       setLoading(true);
       setError(null);
       try {
-        const data = await SupabaseService.getLensListingById(id);
+        const viewerUserId = getUserIdFromToken() ?? undefined;
+        const data = await SupabaseService.getLensListingById(id, { viewerUserId });
         setProduct(data);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Có lỗi xảy ra'));
