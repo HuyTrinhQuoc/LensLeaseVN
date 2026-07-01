@@ -45,6 +45,9 @@ import AdminListingsManagement from '../pages/AdminListingsManagement/AdminListi
 import AdminFinance from '../pages/AdminFinanceDashboard/AdminFinance';
 import AdminOwnerApplicationsPage from '../pages/AdminOwnerApplications/AdminOwnerApplicationsPage';
 import AdminPromotionsPage from '../pages/AdminPromotions/AdminPromotionsPage';
+import DeviceSchedulePage from '../pages/DeviceSchedulePage/ScheduleDashboard';
+import AdminBookingManagement from '../pages/AdminBookingManagement/AdminBookingManagement';
+import { NotificationDropdown } from '../components/AdminNotification/NotificationDropdown';
 
 /**
  * AppRoutes — Cấu hình định tuyến chính của ứng dụng.
@@ -144,7 +147,7 @@ export default function AppRoutes() {
       <Route path="/login/success" element={<LoginSuccess />} />
       <Route path="/verify" element={<VerifyEmail />} />
 
-   <Route path="schedule" element={<Schedule />} />  
+   <Route path="schedule" element={<DeviceSchedulePage />} />  
     </Routes>
   );
 }

@@ -5,12 +5,12 @@ export class ValidatePromotionDto {
   @ApiProperty({ example: 'WELCOME10' })
   @IsString()
   @MinLength(1)
-  code: string | undefined;
+  code!: string;
 
   @ApiProperty({ example: 500000, description: 'Tổng tiền thuê (chưa gồm cọc)' })
   @IsNumber()
   @Min(0)
-  sub_total: number | undefined;
+  sub_total!: number;
 
   @ApiPropertyOptional({ type: [String], description: 'Danh sách lens_id trong đơn' })
   @IsOptional()

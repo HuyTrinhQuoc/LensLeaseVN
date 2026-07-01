@@ -20,16 +20,16 @@ export class CreatePromotionDto {
   @IsString()
   @MinLength(3)
   @MaxLength(50)
-  code: string | undefined;
+  code!: string;
 
   @ApiProperty({ enum: PromotionType, example: PromotionType.PERCENTAGE })
   @IsEnum(PromotionType)
-  discount_type: PromotionType | undefined;
+  discount_type!: PromotionType;
 
   @ApiProperty({ example: 10, description: 'Phần trăm hoặc số tiền giảm' })
   @IsNumber()
   @Min(0)
-  discount_value: number | undefined;
+  discount_value!: number;
 
   @ApiPropertyOptional({ example: 500000 })
   @IsOptional()
@@ -45,11 +45,11 @@ export class CreatePromotionDto {
 
   @ApiProperty({ example: '2026-07-01T00:00:00.000Z' })
   @IsDateString()
-  start_date: string | undefined;
+  start_date!: string;
 
   @ApiProperty({ example: '2026-07-31T23:59:59.000Z' })
   @IsDateString()
-  end_date: string | undefined;
+  end_date!: string;
 
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()
