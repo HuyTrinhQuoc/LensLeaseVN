@@ -81,6 +81,11 @@ const AdminLayout: React.FC = () => {
             <span className="material-symbols-outlined text-[24px]">camera</span>
             Tin đăng & Thiết bị
           </NavLink>
+
+          <NavLink to="/admin/promotions" className={getDesktopNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            Voucher
+          </NavLink>
           
           <NavLink to="/admin/finance" className={getDesktopNavStyle}>
             <span className="material-symbols-outlined text-[24px]">payments</span>
@@ -128,6 +133,11 @@ const AdminLayout: React.FC = () => {
           <NavLink to="/admin/listings" className={getMobileNavStyle}>
             <span className="material-symbols-outlined text-[24px]">camera</span>
             <span className="mt-1 text-xs text-center w-full">Listings</span>
+          </NavLink>
+
+          <NavLink to="/admin/promotions" className={getMobileNavStyle}>
+            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            <span className="mt-1 text-xs text-center w-full">Voucher</span>
           </NavLink>
           
           <NavLink to="/admin/finance" className={getMobileNavStyle}>

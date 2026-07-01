@@ -27,6 +27,54 @@ export type AppliedPromotion = {
   message: string;
 };
 
+export type ManagedPromotion = {
+  id: string;
+  code: string;
+  sponsor_type: 'PLATFORM' | 'OWNER';
+  discount_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discount_value: number;
+  min_order_value: number | null;
+  max_discount_amount: number | null;
+  start_date: string;
+  end_date: string;
+  usage_limit: number | null;
+  used_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  description: string;
+  creator?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+  } | null;
+  applicable_lenses: Array<{
+    id: string;
+    title: string;
+  }>;
+};
+
+export type PromotionLensOption = {
+  id: string;
+  title: string;
+  approval_status: string;
+  available: boolean;
+  price_per_day: number;
+};
+
+export type PromotionUpsertPayload = {
+  code: string;
+  discount_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discount_value: number;
+  min_order_value?: number;
+  max_discount_amount?: number;
+  start_date: string;
+  end_date: string;
+  usage_limit?: number;
+  is_active?: boolean;
+  applicable_lens_ids?: string[];
+};
+
 export const PROMO_STORAGE_KEY = 'lenslease_promotion_code';
 
 export const promotionService = {
@@ -49,6 +97,42 @@ export const promotionService = {
         lens_ids: lensIds,
       },
     );
+  },
+
+  listAdminManaged() {
+    return api.get<{ message: string; data: ManagedPromotion[] }>('/admin/promotions');
+  },
+
+  createAdminManaged(body: PromotionUpsertPayload) {
+    return api.post<{ message: string; data: ManagedPromotion }>('/admin/promotions', body);
+  },
+
+  updateAdminManaged(id: string, body: Partial<PromotionUpsertPayload>) {
+    return api.patch<{ message: string; data: ManagedPromotion }>(`/admin/promotions/${id}`, body);
+  },
+
+  updateAdminManagedStatus(id: string, is_active: boolean) {
+    return api.patch<{ message: string; data: ManagedPromotion }>(`/admin/promotions/${id}/status`, { is_active });
+  },
+
+  listOwnerManaged() {
+    return api.get<{ message: string; data: ManagedPromotion[] }>('/owner/promotions');
+  },
+
+  listOwnerPromotionLenses() {
+    return api.get<{ message: string; data: PromotionLensOption[] }>('/owner/promotions/lenses');
+  },
+
+  createOwnerManaged(body: PromotionUpsertPayload) {
+    return api.post<{ message: string; data: ManagedPromotion }>('/owner/promotions', body);
+  },
+
+  updateOwnerManaged(id: string, body: Partial<PromotionUpsertPayload>) {
+    return api.patch<{ message: string; data: ManagedPromotion }>(`/owner/promotions/${id}`, body);
+  },
+
+  updateOwnerManagedStatus(id: string, is_active: boolean) {
+    return api.patch<{ message: string; data: ManagedPromotion }>(`/owner/promotions/${id}/status`, { is_active });
   },
 };
 
