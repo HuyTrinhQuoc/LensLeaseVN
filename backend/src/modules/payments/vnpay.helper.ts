@@ -16,8 +16,33 @@ export function vnpayCreateDate(d = new Date()): string {
   );
 }
 
-export function vnpayExpireDateMinutesFromNow(minutes = 15, d = new Date()): string {
+export const VNPAY_LINK_EXPIRE_MINUTES = 15;
+
+export function vnpayExpireDateMinutesFromNow(
+  minutes = VNPAY_LINK_EXPIRE_MINUTES,
+  d = new Date(),
+): string {
   return vnpayCreateDate(new Date(d.getTime() + minutes * 60_000));
+}
+
+/** Mô tả tiếng Việt cho mã phản hồi VNPay (return / IPN). */
+export function vnpayResponseMessage(code: string): string {
+  const table: Record<string, string> = {
+    '00': 'Giao dịch thành công',
+    '07': 'Giao dịch bị nghi ngờ gian lận',
+    '09': 'Thẻ/tài khoản chưa đăng ký Internet Banking',
+    '10': 'Xác thực thẻ/tài khoản sai quá 3 lần',
+    '11': 'Hết hạn chờ thanh toán — vui lòng thử lại',
+    '12': 'Thẻ/tài khoản bị khóa',
+    '13': 'Nhập sai mã OTP',
+    '24': 'Bạn đã hủy giao dịch trên cổng VNPay',
+    '51': 'Tài khoản không đủ số dư',
+    '65': 'Vượt hạn mức giao dịch trong ngày',
+    '75': 'Ngân hàng đang bảo trì',
+    '79': 'Nhập sai mật khẩu thanh toán quá số lần quy định',
+    '99': 'Lỗi không xác định từ VNPay',
+  };
+  return table[code] || `VNPay từ chối (mã ${code})`;
 }
 
 /**
@@ -79,7 +104,7 @@ export function buildVnpayPayUrl(input: {
     vnp_Amount: String(vnpayAmountFromVnd(input.amountVnd)),
     vnp_ReturnUrl: input.returnUrl,
     vnp_CreateDate: vnpayCreateDate(),
-    vnp_ExpireDate: vnpayExpireDateMinutesFromNow(15),
+    vnp_ExpireDate: vnpayExpireDateMinutesFromNow(VNPAY_LINK_EXPIRE_MINUTES),
     vnp_IpAddr: (input.clientIp || '127.0.0.1').trim() || '127.0.0.1',
   };
   if (input.bankCode?.trim()) {

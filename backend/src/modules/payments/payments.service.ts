@@ -12,7 +12,13 @@ import { PrismaService } from '../../prisma.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { WalletTopupChannelDto } from './dto/create-wallet-topup.dto';
 import { momoCreateSignature, momoRawSignatureCreate, momoRawSignatureNotify } from './momo.helper';
-import { buildVnpayPayUrl, vnpayAmountFromVnd, vnpayVerify } from './vnpay.helper';
+import {
+  buildVnpayPayUrl,
+  VNPAY_LINK_EXPIRE_MINUTES,
+  vnpayAmountFromVnd,
+  vnpayResponseMessage,
+  vnpayVerify,
+} from './vnpay.helper';
 
 @Injectable()
 export class PaymentsService {
@@ -354,11 +360,27 @@ export class PaymentsService {
         status: 'PENDING',
         type: 'DEPOSIT',
       },
+      orderBy: { created_at: 'desc' },
     });
     if (dup) {
-      throw new BadRequestException(
-        'Đã có giao dịch đang chờ cho nhóm này. Hoàn tất hoặc đợi hết hạn link cũ trước khi tạo mới.',
-      );
+      const ageMs = Date.now() - dup.created_at.getTime();
+      const expired = ageMs > VNPAY_LINK_EXPIRE_MINUTES * 60_000;
+      const amountChanged = Number(dup.amount) !== amountVnd;
+
+      if (expired || amountChanged) {
+        await this.prisma.transaction.update({
+          where: { id: dup.id },
+          data: {
+            status: 'FAILED',
+            description: expired
+              ? 'Link VNPay hết hạn — có thể tạo link thanh toán mới'
+              : 'Số tiền đơn thay đổi — hủy link VNPay cũ',
+          },
+        });
+      } else {
+        // Link còn hiệu lực: tái dùng cùng txnRef, chỉ tạo URL mới (vnp_CreateDate mới).
+        return { amountVnd, pendingTxId: dup.id };
+      }
     }
 
     if (Number(group.total_amount) !== amountVnd) {
@@ -558,16 +580,17 @@ export class PaymentsService {
     const paidOk =
       rsp === '00' && (!txnStatus || txnStatus === '00');
     if (!paidOk) {
+      const reason = vnpayResponseMessage(rsp || '99');
       if (row.status === 'PENDING') {
         await this.prisma.transaction.update({
           where: { id: txnRef },
           data: {
             status: 'FAILED',
-            description: `VNPay từ chối: ${rsp}${txnStatus ? ` / ${txnStatus}` : ''}`,
+            description: `${reason}${txnStatus && txnStatus !== '00' ? ` (trạng thái ${txnStatus})` : ''}`,
           },
         });
       }
-      return { ok: false as const, message: `VNPay: ${rsp}`, bookingGroupId };
+      return { ok: false as const, message: reason, bookingGroupId };
     }
 
     const gatewayRef = flat.vnp_TransactionNo || txnRef;
