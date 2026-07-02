@@ -311,7 +311,7 @@ import { setCredentials, logout } from '../../store/authSlice'; // Đường d�
 import type { RootState } from '../../store/store';
 
 // 2. Import Chuông Thông Báo (Nếu có)
-// import { NotificationDropdown } from '../Notification/NotificationDropdown'; 
+import { NotificationDropdown } from '../AdminNotification/NotificationDropdown';
 
 function Icon({ name, className = '' }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -343,6 +343,8 @@ export default function Header() {
       localStorage.setItem('email', urlEmail || '');
       localStorage.setItem('fullName', urlFullName || 'Người dùng');
       localStorage.setItem('picture', urlPicture || '');
+
+     
 
       const role = getRoleFromToken() || 'USER';
 
@@ -448,13 +450,14 @@ export default function Header() {
           <HeaderSearchAutocomplete />
 
           <div className="dark-header__actions">
-            <a href="tel:19006750" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+            {/* <a href="tel:19006750" className="dark-header__action-item" style={{ textDecoration: 'none', color: 'inherit' }}>
               <Icon name="call" className="dark-header__action-icon" />
               <div className="dark-header__action-text">
                 <span className="label">Gọi mua hàng</span>
                 <strong className="value">1900 6750</strong>
               </div>
-            </a>
+            </a> */}
+            
 
             {/* ================= PHẦN TÀI KHOẢN / ĐĂNG XUẤT ================= */}
             {isLoggedIn ? (
@@ -523,7 +526,11 @@ export default function Header() {
               </div>
               <span>Giỏ hàng</span>
             </Link>
+
+            
           </div>
+          <div className="text-white hover:text-gray-200 "><NotificationDropdown/></div>
+          
         </div>
       </div>
 

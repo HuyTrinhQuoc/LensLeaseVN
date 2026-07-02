@@ -26,6 +26,8 @@ import { AdminBookingModule } from './admin-booking/admin-booking.module';
 import { AdminNotificationModule } from './admin-notification/admin-notification.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { NotificationModule } from './notification/notification.module';
+import { CategoriesModule } from './categories/categories.module';
 
 
 @Module({
@@ -55,6 +57,8 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     AdminBookingModule,
     AdminNotificationModule,
     ScheduleModule,
+    NotificationModule,
+    CategoriesModule,
 
 
   ],

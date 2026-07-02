@@ -47,4 +47,5 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
         // Phát event 'new_user_notification' tới đúng căn phòng của user đó
         this.server.to(`user_${userId}`).emit('new_user_notification', notificationData);
     }
+    
 }

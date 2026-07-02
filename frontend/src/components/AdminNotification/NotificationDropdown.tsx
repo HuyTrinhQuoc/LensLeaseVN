@@ -1,144 +1,178 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNotifications } from '../../hooks/useNotifications';
-import { useSelector } from 'react-redux'; // <--- Thêm import này
-import type{ RootState } from '../../store/store'; // <--- Thêm type này
+// components/NotificationDropdown.tsx
+import React, { useState } from 'react';
+import  type{ Notification } from '../../hooks/useNotifications';
+import  { useNotifications } from '../../hooks/useNotifications';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store/store';
+import { Bell, Check, Info, Calendar, MessageSquare, Tag } from 'lucide-react';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+// Cấu hình plugin cho dayjs để hiển thị "X phút trước"
+dayjs.extend(relativeTime);
 
 export const NotificationDropdown: React.FC = () => {
-  // Lấy user trực tiếp từ Redux store
-  const user = useSelector((state: RootState) => state.auth.user);
+  // LƯU Ý: Ở đây bạn cần lấy userId của người dùng đang đăng nhập.
+
+const user = useSelector((state: RootState) => state.auth.user);
+console.log(user);
   
-  // Lấy ra ID và Role
-  const userId = user?.id;
-  const userRole = user?.role; 
+  // Lấy id từ object user (sử dụng optional chaining '?.' để tránh lỗi nếu user là null)
+  const userId = user?.id ?? null;
 
-  // Truyền linh hoạt vào hook Socket
-  const { 
-    notifications, 
-    unreadCount, 
-    markAsRead, 
-    markAllAsRead, 
-    handleAction 
-  } = useNotifications(userId??'', userRole??'');
+  // Truyền userId vào custom hook mới
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId);
 
+  
+  
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const navigate = useNavigate();
 
-  // Click ra ngoài để đóng dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+  const handleNotificationClick = async (notification: Notification) => {
+  // Đánh dấu đã đọc nếu chưa đọc
+  if (!notification.is_read) {
+    await markAsRead(notification.id);
+  }
+
+  // Đóng dropdown
+  setIsOpen(false);
+
+  // Điều hướng theo loại thông báo
+  switch (notification.type) {
+    case 'BOOKING':
+      if (notification.reference_id) {
+        navigate(`/bookings/${notification.reference_id}`);
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+      break;
 
-  // Helper render UI cho từng loại thông báo
-  const getNotificationStyles = (type: string) => {
+    case 'MESSAGE':
+      if (notification.reference_id) {
+        navigate(`/messages/${notification.reference_id}`);
+      }
+      break;
+
+    case 'PROMOTION':
+      if (notification.reference_id) {
+        navigate(`/promotions/${notification.reference_id}`);
+      }
+      break;
+
+    case 'SYSTEM':
+      navigate('/profile');
+      break;
+
+    default:
+      break;
+  }
+};
+
+  // Hàm chọn icon dựa theo loại thông báo
+  const getIcon = (type: string) => {
     switch (type) {
-      case 'DISPUTE':
-        return { icon: 'gavel', colorClass: 'text-red-500 bg-red-100', actionText: 'Xử lý ngay' };
-      case 'KYC_REQUEST':
-        return { icon: 'id_card', colorClass: 'text-amber-500 bg-amber-100', actionText: 'Duyệt giấy tờ' };
-      case 'PAYOUT_REQUEST':
-        return { icon: 'payments', colorClass: 'text-green-500 bg-green-100', actionText: 'Kiểm tra' };
-      case 'BOOKING':
-        return { icon: 'book_online', colorClass: 'text-blue-500 bg-blue-100', actionText: 'Xem đơn' };
-      default:
-        return { icon: 'info', colorClass: 'text-primary bg-primary/10', actionText: 'Xem chi tiết' };
+      case 'BOOKING': return <Calendar className="w-5 h-5 text-blue-500" />;
+      case 'MESSAGE': return <MessageSquare className="w-5 h-5 text-green-500" />;
+      case 'PROMOTION': return <Tag className="w-5 h-5 text-yellow-500" />;
+      default: return <Info className="w-5 h-5 text-gray-500" />; // SYSTEM
     }
   };
 
-  const formatTimeAgo = (dateStr: string) => {
-    // Hàm rút gọn thời gian (bạn có thể dùng dayjs/date-fns)
-    return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  };
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Tránh render nếu chưa có userId (chưa đăng nhập)
+  if (!userId) return null;
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Nút Chuông */}
-      <button 
+    <div className="relative">
+      {/* Nút Chuông Thông báo */}
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-surface-container-high transition-colors"
+        className="relative p-2  focus:outline-none transition-colors"
       >
-        <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
+        <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full flex items-center justify-center border-2 border-surface">
-            {unreadCount > 9 ? '9+' : unreadCount}
+          <span className="absolute top-0 right-0 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full border-2 border-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Box Dropdown */}
+      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 md:w-96 bg-surface-container-lowest border border-outline/10 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 overflow-hidden flex flex-col max-h-[85vh]">
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-outline/10 flex justify-between items-center bg-surface">
-            <h3 className="font-bold text-on-surface text-base">Thông báo</h3>
+        <div className="absolute right-0 z-50 w-80 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl sm:w-96 overflow-hidden">
+          {/* Header của Dropdown */}
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+            <h3 className="font-semibold text-gray-800">Thông báo</h3>
             {unreadCount > 0 && (
-              <button onClick={markAllAsRead} className="text-xs font-semibold text-primary hover:underline">
-                Đánh dấu đã đọc hết
+              <button
+                onClick={markAllAsRead}
+                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 transition-colors"
+              >
+                <Check className="w-4 h-4" /> Đọc tất cả
               </button>
             )}
           </div>
 
-          {/* List Thông báo */}
-          <div className="overflow-y-auto flex-1 p-2 flex flex-col gap-1">
+          {/* Danh sách thông báo */}
+          <div className="overflow-y-auto max-h-[400px]">
             {notifications.length === 0 ? (
-              <div className="py-8 text-center text-outline text-sm">
-                Không có thông báo mới nào.
+              <div className="flex flex-col items-center justify-center p-8 text-center text-gray-500">
+                <Bell className="w-12 h-12 text-gray-200 mb-2" />
+                <p>Bạn chưa có thông báo nào.</p>
               </div>
             ) : (
-              notifications.map((noti) => {
-                const style = getNotificationStyles(noti.type);
-                return (
-                  <div 
-                    key={noti.id} 
-                    className={`p-3 rounded-xl transition-colors ${noti.is_read ? 'opacity-70 hover:bg-surface-container' : 'bg-surface hover:bg-surface-container-high border-l-4 border-primary'}`}
-                  >
-                    <div className="flex gap-3 items-start">
-                      {/* Icon */}
-                      <div className={`p-2 rounded-full flex-shrink-0 ${style.colorClass}`}>
-                        <span className="material-symbols-outlined text-[20px]">{style.icon}</span>
-                      </div>
-                      
-                      {/* Nội dung */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-bold text-sm text-on-surface truncate pr-2">{noti.title}</h4>
-                          <span className="text-[10px] text-outline flex-shrink-0 whitespace-nowrap">
-                            {formatTimeAgo(noti.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant line-clamp-2 mb-2">
-                          {noti.content}
-                        </p>
-                        
-                        {/* Nhóm Action Buttons */}
-                        <div className="flex gap-2 mt-2">
-                          <button 
-                            onClick={() => { setIsOpen(false); handleAction(noti); }}
-                            className="px-3 py-1.5 bg-primary text-on-primary text-[11px] font-bold rounded-lg hover:bg-primary/90 transition"
-                          >
-                            {style.actionText}
-                          </button>
-                          
-                          {!noti.is_read && (
-                            <button 
-                              onClick={() => markAsRead(noti.id)}
-                              className="px-3 py-1.5 bg-surface-container text-on-surface-variant text-[11px] font-bold rounded-lg hover:bg-surface-container-highest transition"
-                            >
-                              Bỏ qua
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`flex gap-3 p-4 border-b last:border-b-0 cursor-pointer transition-colors ${
+                    !notification.is_read 
+                      ? 'bg-blue-50 hover:bg-blue-100/80' 
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  {/* Icon */}
+                  <div className="flex-shrink-0 mt-1">
+                    {getIcon(notification.type)}
                   </div>
-                );
-              })
+                  
+                  {/* Nội dung */}
+                  <div className="flex-1 pr-4">
+                    <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                      {notification.title}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1 line-clamp-2 leading-snug">
+                      {notification.content}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2 font-medium">
+                      {dayjs(notification.created_at).fromNow()}
+                    </p>
+                  </div>
+
+                  {/* Chấm xanh báo chưa đọc */}
+                  {!notification.is_read && (
+                    <div className="flex-shrink-0 w-2.5 h-2.5 mt-2 bg-blue-600 rounded-full shadow-sm"></div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         </div>

@@ -47,6 +47,7 @@ import AdminBookingManagement from '../pages/AdminBookingManagement/AdminBooking
 import { NotificationDropdown } from '../components/AdminNotification/NotificationDropdown';
 import  { Schedule } from '../pages/DeviceSchedulePage/DeviceSchedulePage';
 import DeviceSchedulePage from '../pages/DeviceSchedulePage/ScheduleDashboard';
+import { AdminCategoryManager } from '../pages/AdminCategory/AdminCategoryManager';
 
 
 /**
@@ -128,6 +129,7 @@ export default function AppRoutes() {
   <Route path="bookings" element={<AdminBookingManagement />} />  
 
     <Route path="notification" element={<NotificationDropdown />} />  
+    <Route path="categories" element={<AdminCategoryManager />} />  
 </Route>
 
       {/* ══════════════════════════════════════════════

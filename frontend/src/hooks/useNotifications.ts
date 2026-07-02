@@ -1,106 +1,104 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-import api from '../services/api'; // Axios instance của bạn
-import type { AppNotification } from '../type/notification';
+import { useState, useEffect, useCallback } from 'react';
+import api from '../services/api';
+import { supabase } from '../lib/supabase';
 
-// Sửa dòng này: thêm tham số userRole
-export const useNotifications = (userId: string, userRole: string) => {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const navigate = useNavigate();
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  type: 'SYSTEM' | 'BOOKING' | 'MESSAGE' | 'PROMOTION';
+  reference_id: string | null;
+}
 
-  // 1. Fetch thông báo từ API khi khởi tạo
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await api.get('/admin/notifications?is_read=false');
-        setNotifications(res.data.data);
-      } catch (error) {
-        console.error('Lỗi khi lấy thông báo:', error);
-      }
-    };
-    if (userId) fetchNotifications();
+// Truyền userId (có thể lấy từ Auth Context/Redux) vào hook này
+export const useNotifications = (userId: string | null) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Hàm gọi API lấy lịch sử thông báo lúc mới load trang
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLoading(true);
+      const response = await api.get('/notifications');
+      console.log(response.data);
+      const data = response.data;
+      setNotifications(data);
+      setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
+    } catch (error) {
+      console.error('Lỗi khi tải thông báo:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
-  // 2. Thiết lập kết nối Socket.io
+  // Thiết lập Supabase Realtime
   useEffect(() => {
+    fetchNotifications();
+
     if (!userId) return;
 
-    const newSocket = io('http://localhost:3000', {
-      query: { userId, role: userRole }, // Bây giờ userRole đã tồn tại
-    });
+    // Đăng ký kênh lắng nghe sự kiện
+    const channel = supabase
+      .channel('realtime-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT', // Chỉ quan tâm khi có thông báo mới được tạo
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`, // Bắt buộc: Chỉ nghe thông báo thuộc về user này
+        },
+        (payload) => {
+          // Khi có thông báo mới, payload.new sẽ chứa dữ liệu của dòng vừa insert
+          const newNotification = payload.new as Notification;
+          
+          // Thêm thông báo mới vào đầu danh sách và tăng số đếm chưa đọc
+          setNotifications((prev) => [newNotification, ...prev]);
+          setUnreadCount((prev) => prev + 1);
 
-    if (userRole === 'ADMIN') {
-      newSocket.on('new_admin_notification', (newNoti) => {
-        setNotifications((prev) => [newNoti, ...prev]);
-      });
-    } else {
-      newSocket.on('new_user_notification', (newNoti) => {
-        setNotifications((prev) => [newNoti, ...prev]);
-      });
-    }
+          // Tùy chọn: Chạy âm thanh ting ting hoặc bật Toast/Snackbar ở đây
+        }
+      )
+      .subscribe();
 
-    setSocket(newSocket);
-    return () => { newSocket.close(); };
-  }, [userId, userRole]); 
+    // Dọn dẹp (Cleanup) khi component unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, fetchNotifications]);
 
-  // ... (giữ nguyên các phần code bên dưới của bạn)
-
-  // 3. Hàm đánh dấu đã đọc
-  const markAsRead = async (notiId: string) => {
+  const markAsRead = async (id: string) => {
     try {
-      await api.patch(`/admin/notifications/${notiId}/read`);
-      setNotifications((prev) => prev.filter((n) => n.id !== notiId));
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Lỗi đánh dấu đã đọc:', error);
+      console.error('Lỗi khi đánh dấu đã đọc:', error);
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      await api.post(`/admin/notifications/read-all`);
-      setNotifications([]);
+      await api.patch('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
     } catch (error) {
-      console.error('Lỗi đánh dấu tất cả:', error);
-    }
-  };
-
-  // 4. ACTION (Quan trọng nhất): Điều hướng & Xử lý dựa trên Loại thông báo
-  const handleAction = async (noti: AppNotification) => {
-    // Tự động đánh dấu đã đọc khi click
-    if (!noti.is_read) {
-      markAsRead(noti.id);
-    }
-
-    if (!noti.reference_id) return;
-
-    switch (noti.type) {
-      case 'KYC_REQUEST':
-        // Chuyển đến trang User Management và mở popup duyệt user đó
-        navigate(`/admin/users?highlight_id=${noti.reference_id}&action=review_kyc`);
-        break;
-      case 'DISPUTE':
-        // Chuyển đến trang Tranh chấp
-        navigate(`/admin/disputes/${noti.reference_id}`);
-        break;
-      case 'PAYOUT_REQUEST':
-        // Chuyển đến trang Tài chính/Rút tiền
-        navigate(`/admin/finance?payout_id=${noti.reference_id}`);
-        break;
-      case 'BOOKING':
-        navigate(`/admin/bookings?highlight_id=${noti.reference_id}`);
-        break;
-      default:
-        console.log('Không có action cụ thể cho type này');
+      console.error('Lỗi khi đánh dấu đọc tất cả:', error);
     }
   };
 
   return {
     notifications,
-    unreadCount: notifications.filter(n => !n.is_read).length,
+    unreadCount,
+    loading,
     markAsRead,
     markAllAsRead,
-    handleAction
   };
 };

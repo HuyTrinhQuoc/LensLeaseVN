@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { NotificationsController } from './admin-notification.controller';
+import { UserNotificationsController } from './admin-notification.controller';
 import { NotificationsService } from './admin-notification.service';
 import { NotificationsGateway } from './admin-notification.gateway';
 import { PrismaService } from '../prisma.service';
 
 @Module({
 
-  controllers: [NotificationsController],
+  controllers: [UserNotificationsController],
   providers: [NotificationsService, NotificationsGateway, PrismaService],
-  exports: [NotificationsGateway], // Export để các module khác (VD: OrderModule) dùng được
+  exports: [NotificationsGateway, NotificationsService], // Export để các module khác (VD: OrderModule) dùng được
 })
 export class AdminNotificationModule {}

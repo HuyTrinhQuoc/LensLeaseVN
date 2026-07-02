@@ -31,7 +31,7 @@ const LoginSuccess = () => {
     if (token) {
       // 1. Lưu token
       localStorage.setItem('token', token);
-      
+       console.log(token);
       // 2. Lưu thông tin User (để sau này hiển thị Avatar, Tên ở Header)
       const userInfo = {
         email: email || '',

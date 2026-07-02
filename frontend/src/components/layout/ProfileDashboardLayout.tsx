@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import ProfileSidebar from './ProfileSidebar';
 import '../../styles/profile-dashboard.css';
+import { NotificationDropdown } from '../AdminNotification/NotificationDropdown';
 
 /**
  * ProfileDashboardLayout — Layout chính cho khu vực User Profile / Dashboard.
@@ -67,10 +68,7 @@ export default function ProfileDashboardLayout() {
 
           <div className="pdb-topbar__right">
             {/* Notification */}
-            <button className="pdb-topbar__icon-btn" title="Thông báo">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="pdb-topbar__notif-dot" />
-            </button>
+            <NotificationDropdown/>
 
             {/* Help */}
             <button className="pdb-topbar__icon-btn" title="Trợ giúp">

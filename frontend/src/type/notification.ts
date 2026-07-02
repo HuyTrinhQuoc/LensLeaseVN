@@ -1,18 +1,18 @@
-export type NotificationType = 
-  | 'SYSTEM' 
-  | 'BOOKING' 
-  | 'MESSAGE' 
-  | 'PROMOTION'
-  | 'KYC_REQUEST' // Yêu cầu duyệt CCCD
-  | 'DISPUTE'     // Tranh chấp
-  | 'PAYOUT_REQUEST'; // Yêu cầu rút tiền
+export type NotificationType = 'SYSTEM' | 'BOOKING' | 'MESSAGE' | 'PROMOTION';
 
-export interface AppNotification {
+export type UserRole = 'USER' | 'OWNER' | 'ADMIN';
+
+export interface Notification {
   id: string;
+  user_id: string;
   title: string;
   content: string;
   is_read: boolean;
-  created_at: string;
   type: NotificationType;
-  reference_id: string | null;
+  reference_id?: string | null;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  data: Notification[];
 }

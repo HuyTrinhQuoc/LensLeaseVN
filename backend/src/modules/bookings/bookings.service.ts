@@ -9,11 +9,14 @@ import { LensAvailabilityService } from '../lens-availability/lens-availability.
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { EkycService } from '../ekyc/ekyc.service';
+import { NotificationType } from '@prisma/client';
+
 import {
   parseDateOnlyLocal,
   toDateOnlyString,
   isYmdBetweenInclusive,
 } from '../../common/date-only.util';
+import { NotificationsService } from '../../notification/notification.service';
 
 /** Tỉ lệ phí sàn: 8% */
 const PLATFORM_FEE_RATE = 0.08;
@@ -26,6 +29,7 @@ export class BookingsService {
     private readonly walletLedger: WalletLedgerService,
     private readonly promotionsService: PromotionsService,
     private readonly ekycService: EkycService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ═══════════════════════════════════════════
@@ -305,8 +309,13 @@ export class BookingsService {
         },
       });
 
+
+
+
+
       return newBooking;
     });
+
 
     return booking;
   }
@@ -322,7 +331,8 @@ export class BookingsService {
 
     await this.ekycService.assertUserKycApproved(userId);
 
-    return this.prisma.$transaction(async (tx) => {
+    // return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       type Line = {
         lens: {
           id: string;
@@ -456,6 +466,7 @@ export class BookingsService {
         },
       });
 
+
       if (promotionId) {
         await this.promotionsService.incrementUsage(promotionId, tx);
       }
@@ -555,7 +566,37 @@ export class BookingsService {
         bookings,
       };
     });
+
+
+
+
+    if (result && result.bookings && result.bookings.length > 0) {
+      for (const booking of result.bookings) {
+        try {
+          await this.notificationsService.create({
+            userId: booking.owner_id, // Gửi cho chủ của thiết bị này
+            title: 'Có người đặt thuê máy ảnh của bạn!',
+            content: `Thiết bị của bạn vừa được đặt thuê thành công (Nhóm đơn: #${result.booking_group_id.slice(0, 8)}). Mã đơn: #${booking.id.slice(0, 8)}`,
+            type: NotificationType.BOOKING, // Thay bằng NotificationType.BOOKING nếu bạn dùng Enum
+            referenceId: booking.id, // Vẫn truyền đúng ID của đơn hàng con
+          });
+        } catch (notiError) {
+          // Bọc try/catch để nếu 1 thông báo bị lỗi thì luồng code vẫn chạy, không ảnh hưởng đơn hàng
+          console.error(`❌ Lỗi khi gửi thông báo cho owner ${booking.owner_id}:`, notiError);
+        }
+      }
+    }
   }
+
+
+
+
+
+
+
+
+
+
 
   /**
    * Danh sách booking (lọc theo role + status + ngày + tìm kiếm).
@@ -882,7 +923,7 @@ export class BookingsService {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
     this.assertStatus(booking, 'PENDING', 'Chỉ có thể duyệt đơn đang chờ');
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = this.prisma.$transaction(async (tx) => {
       const alreadyCharged = await tx.transaction.count({
         where: {
           booking_id: bookingId,
@@ -901,6 +942,17 @@ export class BookingsService {
         include: this.defaultBookingInclude(),
       });
     });
+
+  
+      await this.notificationsService.create({
+        userId: booking.user_id, // Gửi cho người thuê
+        title: 'Đơn thuê của bạn đã được duyệt!',
+        content: `Chủ máy đã đồng ý cho thuê thiết bị. Mã đơn hàng: #${booking.id.slice(0, 8)}.`,
+        type: 'BOOKING', 
+        referenceId: booking.id,
+      });
+      return result;
+    
   }
 
   /**
@@ -910,11 +962,20 @@ export class BookingsService {
     const booking = await this.getBookingForOwner(bookingId, ownerId);
     this.assertStatus(booking, 'PENDING', 'Chỉ có thể từ chối đơn đang chờ');
 
-    return this.prisma.booking.update({
+    const result = this.prisma.booking.update({
       where: { id: bookingId },
       data: { status: 'REJECTED' },
       include: this.defaultBookingInclude(),
     });
+    await this.notificationsService.create({
+  userId: booking.user_id,
+  title: 'Yêu cầu thuê đã bị từ chối',
+  content: `Chủ máy đã từ chối yêu cầu thuê của bạn. Mã đơn hàng: #${booking.id.slice(0, 8)}.`,
+  type: NotificationType.BOOKING,
+  referenceId: booking.id,
+});
+
+return result;
   }
 
   /**
